@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = []
+members = ["crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent"]
 
 [workspace.package]
 version = "0.1.0"
