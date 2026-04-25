@@ -1,6 +1,22 @@
-[http]
-check-revoke = false
+[build]
+target = "x86_64-unknown-none"
 
 [target.x86_64-unknown-none]
-linker = "ld.lld"
-rustflags = []
+runner = "bootimage runner"
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+    "-C", "link-arg=-static",
+    "-C", "link-arg=-no-pie",
+    "-C", "link-arg=-Tkernel/src/arch/x86_64/linker.ld",
+    "-C", "code-model=kernel",
+    "-C", "relocation-model=static",
+    "-C", "panic=abort",
+]
+
+[target.aarch64-unknown-none]
+linker = "aarch64-linux-gnu-gcc"
+rustflags = [
+    "-C", "link-arg=-Tkernel/src/arch/aarch64/linker.ld",
+    "-C", "target-feature=+strict-align",
+    "-C", "panic=abort",
+]

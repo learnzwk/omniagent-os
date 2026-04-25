@@ -1,3 +1,37 @@
 [workspace]
-members = ["kernel"]
 resolver = "2"
+members = []
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+omniagent-syscall = { path = "crates/omniagent-syscall" }
+omniagent-ipc = { path = "crates/omniagent-ipc" }
+omniagent-driver = { path = "crates/omniagent-driver" }
+libagent = { path = "crates/libagent" }
+bitflags = "2.5"
+spin = "0.9"
+volatile = "0.5"
+log = "0.4"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+[profile.dev]
+panic = "abort"
+opt-level = 0
+debug = true
+lto = false
+incremental = true
+
+[profile.release]
+panic = "abort"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.test]
+opt-level = 1
+debug = 2
