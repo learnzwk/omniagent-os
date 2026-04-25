@@ -1,0 +1,6 @@
+[http]
+check-revoke = false
+
+[target.x86_64-unknown-none]
+linker = "ld.lld"
+rustflags = []
