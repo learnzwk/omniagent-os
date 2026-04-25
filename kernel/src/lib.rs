@@ -3,6 +3,8 @@
 #[cfg(not(test))]
 use core::panic::PanicInfo;
 
+pub mod vga;
+
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
