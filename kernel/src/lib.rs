@@ -7,6 +7,7 @@ pub mod boot;
 pub mod vga;
 pub mod drivers;
 pub mod arch;
+pub mod memory;
 
 #[cfg(not(test))]
 #[panic_handler]
