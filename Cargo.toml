@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["kernel", "crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent", "crates/omniagent-automation", "crates/omniagent-memory", "crates/omniagent-learning", "crates/omniagent-multimodal", "crates/omniagent-shell", "crates/omniagent-distributed", "crates/omniagent-security"]
+members = ["kernel", "crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent", "crates/omniagent-automation", "crates/omniagent-memory", "crates/omniagent-learning", "crates/omniagent-multimodal", "crates/omniagent-shell", "crates/omniagent-distributed", "crates/omniagent-security", "crates/omniagent-compositor", "crates/omniagent-inference", "crates/omniagent-virt", "crates/omniagent-fs", "crates/omniagent-net"]
 
 [workspace.package]
 version = "0.1.0"

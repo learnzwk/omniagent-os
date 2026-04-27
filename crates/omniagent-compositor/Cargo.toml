@@ -1,0 +1,7 @@
+[package]
+name = "omniagent-compositor"
+version = "0.1.0"
+edition = "2021"
+
+# 无外部依赖，纯逻辑框架
+[dependencies]
