@@ -19,7 +19,7 @@ check:
 
 test:
 	cargo test --workspace --exclude omniagent-kernel
-	cargo bootimage --test
+	cargo test --target x86_64-unknown-linux-gnu -p omniagent-kernel -- --test-threads=1
 
 clean:
 	cargo clean && rm -rf target/bootimage

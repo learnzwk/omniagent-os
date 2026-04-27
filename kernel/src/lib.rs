@@ -10,6 +10,8 @@ pub mod arch;
 pub mod interrupts;
 pub mod memory;
 pub mod time;
+pub mod syscall;
+pub mod agent;
 
 #[cfg(not(test))]
 #[panic_handler]

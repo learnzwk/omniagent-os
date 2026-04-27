@@ -29,7 +29,9 @@ mod tests {
 
     #[test]
     fn test_page_mask() {
-        assert_eq!(PAGE_SIZE_MASK & 0x1FFF, 0);
+        // PAGE_SIZE_MASK 应该清除低 12 位 (页内偏移)
+        assert_eq!(PAGE_SIZE_MASK & 0xFFF, 0);
+        // PAGE_SIZE_MASK 应该保留页对齐的位
         assert_eq!(PAGE_SIZE_MASK & 0x2000, 0x2000);
     }
 }

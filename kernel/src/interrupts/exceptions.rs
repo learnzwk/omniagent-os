@@ -51,6 +51,19 @@ pub extern "C" fn breakpoint_handler(frame: *const InterruptStackFrame) {
     }
 }
 
+/// 无效操作码 (Vector 6)
+pub extern "C" fn invalid_opcode_handler(frame: *const InterruptStackFrame) {
+    unsafe {
+        let frame_ref = &*frame;
+        let mut serial = SERIAL.lock();
+        let _ = write!(
+            serial,
+            "\nEXCEPTION: Invalid Opcode at {:#018X}\n",
+            frame_ref.instruction_pointer,
+        );
+    }
+}
+
 /// General Protection Fault (Vector 13)
 pub extern "C" fn gp_fault_handler(
     frame: *const InterruptStackFrame,

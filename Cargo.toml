@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent"]
+members = ["kernel", "crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent", "crates/omniagent-automation", "crates/omniagent-memory", "crates/omniagent-learning", "crates/omniagent-multimodal", "crates/omniagent-shell", "crates/omniagent-distributed", "crates/omniagent-security"]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
