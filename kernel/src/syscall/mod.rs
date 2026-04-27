@@ -6,6 +6,7 @@
 pub mod abi;
 pub mod numbers;
 pub mod dispatch;
+pub mod posix;
 
 // 导出核心类型，方便其他内核模块直接使用
 pub use abi::{

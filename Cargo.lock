@@ -36,6 +36,10 @@ name = "omniagent-compositor"
 version = "0.1.0"
 
 [[package]]
+name = "omniagent-desktop"
+version = "0.1.0"
+
+[[package]]
 name = "omniagent-distributed"
 version = "0.1.0"
 

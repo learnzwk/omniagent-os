@@ -1,5 +1,8 @@
 //! PS/2 键盘驱动
 
+#[cfg(not(test))]
+use alloc::format;
+
 use crate::arch::x86_64::port_io::{inb, outb};
 use crate::drivers::serial::SERIAL;
 

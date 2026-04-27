@@ -354,6 +354,28 @@ impl CommManager {
     }
 }
 
+/// 全局通信管理器实例
+static COMM_MANAGER: spin::Lazy<Mutex<CommManager>> = spin::Lazy::new(|| {
+    Mutex::new(CommManager::new())
+});
+
+/// 初始化全局通信管理器
+///
+/// 创建通信管理器实例，准备邮箱和订阅表。
+/// 在内核启动的子系统初始化阶段调用。
+pub fn init() {
+    // 通过 Lazy 的首次访问自动创建实例
+    // 此函数确保在启动阶段显式初始化
+    let _comm = COMM_MANAGER.lock();
+}
+
+/// 获取全局通信管理器的引用
+///
+/// 返回全局通信管理器的锁守卫，用于执行消息路由操作。
+pub fn global_comm_manager() -> &'static spin::Lazy<Mutex<CommManager>> {
+    &COMM_MANAGER
+}
+
 /// 检查主题是否匹配
 ///
 /// 支持精确匹配和前缀匹配 (以 '*' 结尾的主题)。
@@ -743,6 +765,27 @@ mod tests {
         assert_eq!(comm.mailbox_len(dst), 2);
 
         comm.receive(dst).unwrap();
+        assert_eq!(comm.mailbox_len(dst), 1);
+    }
+
+    /// 测试：模块级 init 函数
+    #[test]
+    fn test_comm_init() {
+        // 调用模块级 init 函数
+        init();
+
+        // 验证全局通信管理器可访问且功能正常
+        let comm = COMM_MANAGER.lock();
+
+        // 验证空邮箱
+        assert!(comm.mailbox_is_empty(AgentHandle(1)));
+        assert_eq!(comm.mailbox_len(AgentHandle(1)), 0);
+
+        // 验证可以发送消息
+        let src = AgentHandle(1);
+        let dst = AgentHandle(2);
+        let header = AgentMsgHeader::default();
+        assert!(comm.send_message(src, dst, &header).is_ok());
         assert_eq!(comm.mailbox_len(dst), 1);
     }
 }

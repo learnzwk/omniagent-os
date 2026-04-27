@@ -2,6 +2,9 @@
 //!
 //! 使用 PIT (8254) 作为初始定时器，后续切换到 APIC Timer
 
+#[cfg(not(test))]
+use alloc::format;
+
 use crate::arch::x86_64::port_io::outb;
 use crate::drivers::serial::SERIAL;
 use core::sync::atomic::{AtomicU64, Ordering};

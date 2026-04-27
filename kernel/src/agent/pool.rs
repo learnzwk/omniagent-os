@@ -232,6 +232,27 @@ impl AgentPool {
     }
 }
 
+/// 全局 Agent 池实例
+static AGENT_POOL: spin::Lazy<Mutex<AgentPool>> = spin::Lazy::new(|| {
+    Mutex::new(AgentPool::new())
+});
+
+/// 初始化全局 Agent 池
+///
+/// 创建并初始化 Agent 池，将所有槽位设为空。
+/// 在内核启动的子系统初始化阶段调用。
+pub fn init() {
+    let pool = AGENT_POOL.lock();
+    pool.init();
+}
+
+/// 获取全局 Agent 池的引用
+///
+/// 返回全局 Agent 池的锁守卫，用于执行 Agent 管理操作。
+pub fn global_pool() -> &'static spin::Lazy<Mutex<AgentPool>> {
+    &AGENT_POOL
+}
+
 // ============================================================================
 // 测试
 // ============================================================================
@@ -503,5 +524,17 @@ mod tests {
     fn test_pool_initial_active_count() {
         let pool = new_pool();
         assert_eq!(pool.active_count(), 0);
+    }
+
+    /// 测试：模块级 init 函数
+    #[test]
+    fn test_pool_init() {
+        // 调用模块级 init 函数
+        init();
+
+        // 验证全局池可访问
+        let pool = AGENT_POOL.lock();
+        assert_eq!(pool.active_count(), 0);
+        assert_eq!(pool.capacity(), MAX_AGENTS);
     }
 }

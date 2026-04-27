@@ -1,6 +1,12 @@
 #![cfg_attr(not(test), no_std)]
 
 #[cfg(not(test))]
+extern crate alloc;
+
+#[cfg(test)]
+extern crate alloc;
+
+#[cfg(not(test))]
 use core::panic::PanicInfo;
 
 pub mod boot;
@@ -12,6 +18,10 @@ pub mod memory;
 pub mod time;
 pub mod syscall;
 pub mod agent;
+pub mod scheduler;
+pub mod fs;
+pub mod net;
+pub mod security;
 
 #[cfg(not(test))]
 #[panic_handler]
@@ -19,7 +29,7 @@ fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
-pub const KERNEL_VERSION: &str = "0.1.0";
+pub const KERNEL_VERSION: &str = "0.2.0";
 pub const KERNEL_NAME: &str = "OmniAgent OS";
 
 pub fn version() -> &'static str {

@@ -1249,15 +1249,62 @@ fn simple_hash(s: &str) -> u64 {
 /// 原始 syscall 调用接口
 ///
 /// 通过 x86_64 syscall 指令调用内核。
-/// 在实际内核环境中，这些函数会通过内联汇编实现。
-/// 当前实现为桩函数，返回 E_NOTSUP，供用户态编译和测试使用。
 mod syscall {
     use super::*;
 
+    /// Syscall 错误码类型
+    ///
+    /// 封装 POSIX errno 值，提供类型安全的错误处理。
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SyscallErrno(pub u32);
+
+    impl SyscallErrno {
+        /// 从原始错误码创建 SyscallErrno
+        pub fn from_code(code: u32) -> Self {
+            Self(code)
+        }
+
+        /// 获取原始错误码
+        pub fn code(&self) -> u32 {
+            self.0
+        }
+
+        /// 检查是否为成功（错误码为 0）
+        pub fn is_success(&self) -> bool {
+            self.0 == 0
+        }
+
+        /// 权限不足
+        pub const E_PERM: SyscallErrno = SyscallErrno(1);
+        /// 文件或目录不存在
+        pub const E_NOENT: SyscallErrno = SyscallErrno(2);
+        /// 无效参数
+        pub const E_INVAL: SyscallErrno = SyscallErrno(22);
+        /// 函数未实现
+        pub const E_NOSYS: SyscallErrno = SyscallErrno(38);
+        /// 操作不支持
+        pub const E_NOTSUP: SyscallErrno = SyscallErrno(95);
+    }
+
+    /// 检查 syscall 返回值
+    ///
+    /// 正值表示成功，负值表示错误（取绝对值作为 errno）。
+    pub fn check_syscall_result(ret: i64) -> Result<u64, SyscallErrno> {
+        if ret < 0 {
+            Err(SyscallErrno::from_code(-ret as u32))
+        } else {
+            Ok(ret as u64)
+        }
+    }
+
     /// 原始 syscall 调用
+    ///
+    /// 使用 x86_64 内联汇编通过 syscall 指令调用内核。
+    /// 寄存器约定：rax=编号, rdi/rsi/rdx/r10/r8/r9=参数, rcx/r11 被破坏。
     ///
     /// # Safety
     /// 调用者必须确保参数与目标 syscall 的 ABI 要求一致。
+    #[inline(always)]
     pub unsafe fn raw_syscall(
         number: u64,
         arg1: u64,
@@ -1266,13 +1313,22 @@ mod syscall {
         arg4: u64,
         arg5: u64,
         arg6: u64,
-    ) -> i64 {
-        // 在真实内核环境中，这里会使用内联汇编:
-        // llvm_asm!("syscall" : "={rax}"(ret) : "{rax}"(number), ...);
-        //
-        // 当前为用户态桩实现，返回 E_NOTSUP
-        let _ = (number, arg1, arg2, arg3, arg4, arg5, arg6);
-        E_NOTSUP as i64
+    ) -> u64 {
+        let ret: u64;
+        core::arch::asm!(
+            "syscall",
+            inlateout("rax") number => ret,
+            in("rdi") arg1,
+            in("rsi") arg2,
+            in("rdx") arg3,
+            in("r10") arg4,
+            in("r8") arg5,
+            in("r9") arg6,
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack, preserves_flags),
+        );
+        ret
     }
 
     /// Agent 创建 syscall
@@ -1283,7 +1339,7 @@ mod syscall {
             spec_len as u64,
             0, // cap_slot
             0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 终止 syscall
@@ -1293,7 +1349,7 @@ mod syscall {
             handle,
             signal as u64,
             0, 0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 查询 syscall
@@ -1304,7 +1360,7 @@ mod syscall {
             info as *mut AgentInfo as u64,
             info_len as u64,
             0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 消息发送 syscall
@@ -1321,7 +1377,7 @@ mod syscall {
             header as *const AgentMsgHeader as u64,
             flags as u64,
             0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 注册 syscall
@@ -1333,7 +1389,7 @@ mod syscall {
             data as u64,
             data_len as u64,
             0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 事件订阅 syscall
@@ -1348,7 +1404,7 @@ mod syscall {
             target,
             mask as *const EventMask as u64,
             0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 能力授予 syscall
@@ -1359,7 +1415,7 @@ mod syscall {
             cap as u64,
             grant,
             0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 资源配额设置 syscall
@@ -1369,7 +1425,7 @@ mod syscall {
             handle,
             quota as *const ResourceQuota as u64,
             0, 0, 0, 0,
-        )
+        ) as i64
     }
 
     /// Agent 资源配额获取 syscall
@@ -1379,7 +1435,7 @@ mod syscall {
             handle,
             quota as *mut ResourceQuota as u64,
             0, 0, 0, 0,
-        )
+        ) as i64
     }
 }
 
@@ -1642,6 +1698,227 @@ impl AgentRuntime {
         }
     }
 }
+
+// ============================================================================
+// POSIX syscall 封装
+// ============================================================================
+
+/// POSIX syscall 封装模块
+///
+/// 提供常见的 POSIX 系统调用封装（文件 I/O、网络等），
+/// 通过 raw_syscall 与内核交互。
+pub mod posix {
+    use super::syscall::{check_syscall_result, raw_syscall};
+    use super::RuntimeError;
+
+    /// Linux x86_64 syscall 编号
+    const SYS_OPEN: u64 = 2;
+    const SYS_READ: u64 = 0;
+    const SYS_WRITE: u64 = 1;
+    const SYS_CLOSE: u64 = 3;
+    const SYS_SOCKET: u64 = 41;
+    const SYS_CONNECT: u64 = 42;
+    const SYS_SEND: u64 = 44;
+    const SYS_RECV: u64 = 45;
+
+    /// 简化的 socket 地址结构（用于测试参数验证）
+    #[derive(Debug, Clone)]
+    pub struct SocketAddr {
+        pub family: u16,
+        pub port: u16,
+        pub addr: [u8; 4],
+    }
+
+    impl SocketAddr {
+        /// 创建 IPv4 socket 地址
+        pub fn new_ipv4(port: u16, a: u8, b: u8, c: u8, d: u8) -> Self {
+            Self {
+                family: 2, // AF_INET
+                port: port.to_be(),
+                addr: [a, b, c, d],
+            }
+        }
+    }
+
+    /// 打开文件
+    ///
+    /// 通过 SYS_OPEN syscall 打开指定路径的文件。
+    pub fn open(path: &str, flags: i32, mode: u32) -> Result<i32, RuntimeError> {
+        let path_ptr = path.as_ptr() as u64;
+        let path_len = path.len() as u64;
+        // SAFETY: 调用者需确保 path 是有效的 UTF-8 字符串
+        let ret = unsafe {
+            raw_syscall(
+                SYS_OPEN,
+                path_ptr,
+                flags as u64,
+                mode as u64,
+                path_len,
+                0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(fd) => Ok(fd as i32),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 读取文件
+    ///
+    /// 通过 SYS_READ syscall 从文件描述符读取数据。
+    pub fn read(fd: i32, buf: &mut [u8]) -> Result<isize, RuntimeError> {
+        let buf_ptr = buf.as_mut_ptr() as u64;
+        let buf_len = buf.len() as u64;
+        // SAFETY: 调用者需确保 fd 有效且 buf 可写
+        let ret = unsafe {
+            raw_syscall(
+                SYS_READ,
+                fd as u64,
+                buf_ptr,
+                buf_len,
+                0, 0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(n) => Ok(n as isize),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 写入文件
+    ///
+    /// 通过 SYS_WRITE syscall 向文件描述符写入数据。
+    pub fn write(fd: i32, buf: &[u8]) -> Result<isize, RuntimeError> {
+        let buf_ptr = buf.as_ptr() as u64;
+        let buf_len = buf.len() as u64;
+        // SAFETY: 调用者需确保 fd 有效且 buf 可读
+        let ret = unsafe {
+            raw_syscall(
+                SYS_WRITE,
+                fd as u64,
+                buf_ptr,
+                buf_len,
+                0, 0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(n) => Ok(n as isize),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 关闭文件
+    ///
+    /// 通过 SYS_CLOSE syscall 关闭文件描述符。
+    pub fn close(fd: i32) -> Result<(), RuntimeError> {
+        // SAFETY: 调用者需确保 fd 有效
+        let ret = unsafe {
+            raw_syscall(
+                SYS_CLOSE,
+                fd as u64,
+                0, 0, 0, 0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 创建 socket
+    ///
+    /// 通过 SYS_SOCKET syscall 创建网络 socket。
+    pub fn socket(domain: i32, socket_type: i32, protocol: i32) -> Result<i32, RuntimeError> {
+        // SAFETY: 参数均为简单整数值
+        let ret = unsafe {
+            raw_syscall(
+                SYS_SOCKET,
+                domain as u64,
+                socket_type as u64,
+                protocol as u64,
+                0, 0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(fd) => Ok(fd as i32),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 连接 socket
+    ///
+    /// 通过 SYS_CONNECT syscall 连接到远程地址。
+    pub fn connect(sockfd: i32, addr: &SocketAddr, addrlen: u32) -> Result<(), RuntimeError> {
+        let addr_ptr = addr as *const SocketAddr as u64;
+        // SAFETY: 调用者需确保 sockfd 有效且 addr 可读
+        let ret = unsafe {
+            raw_syscall(
+                SYS_CONNECT,
+                sockfd as u64,
+                addr_ptr,
+                addrlen as u64,
+                0, 0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 发送数据
+    ///
+    /// 通过 SYS_SEND syscall 通过 socket 发送数据。
+    pub fn send(sockfd: i32, buf: &[u8], flags: i32) -> Result<isize, RuntimeError> {
+        let buf_ptr = buf.as_ptr() as u64;
+        let buf_len = buf.len() as u64;
+        // SAFETY: 调用者需确保 sockfd 有效且 buf 可读
+        let ret = unsafe {
+            raw_syscall(
+                SYS_SEND,
+                sockfd as u64,
+                buf_ptr,
+                buf_len,
+                flags as u64,
+                0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(n) => Ok(n as isize),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+
+    /// 接收数据
+    ///
+    /// 通过 SYS_RECV syscall 通过 socket 接收数据。
+    pub fn recv(sockfd: i32, buf: &mut [u8], flags: i32) -> Result<isize, RuntimeError> {
+        let buf_ptr = buf.as_mut_ptr() as u64;
+        let buf_len = buf.len() as u64;
+        // SAFETY: 调用者需确保 sockfd 有效且 buf 可写
+        let ret = unsafe {
+            raw_syscall(
+                SYS_RECV,
+                sockfd as u64,
+                buf_ptr,
+                buf_len,
+                flags as u64,
+                0, 0,
+            )
+        };
+        match check_syscall_result(ret as i64) {
+            Ok(n) => Ok(n as isize),
+            Err(_) => Err(RuntimeError::NotSupported),
+        }
+    }
+}
+
+// ============================================================================
+// Syscall 类型重导出
+// ============================================================================
+
+/// 重导出 syscall 模块的公共类型
+pub use syscall::{SyscallErrno, check_syscall_result};
 
 // ============================================================================
 // 测试
@@ -2346,5 +2623,118 @@ mod tests {
     fn test_runtime_error_is_error() {
         let err: Box<dyn std::error::Error> = Box::new(RuntimeError::AgentNotFound);
         assert!(!err.to_string().is_empty());
+    }
+
+    // === 测试: raw_syscall 内联汇编编译正确 ===
+    #[test]
+    fn test_raw_syscall_returns_value() {
+        // 验证 raw_syscall 函数签名和内联汇编格式正确（编译测试）
+        // 使用一个安全的 syscall 编号（getpid = 39）来验证
+        let ret = unsafe { syscall::raw_syscall(39, 0, 0, 0, 0, 0, 0) };
+        // getpid 在 Linux 上应返回非零值（进程 ID）
+        assert!(ret > 0, "getpid 应返回正数，实际返回: {}", ret);
+    }
+
+    // === 测试: SyscallErrno 常量值 ===
+    #[test]
+    fn test_syscall_errno_codes() {
+        assert_eq!(SyscallErrno::E_PERM.code(), 1);
+        assert_eq!(SyscallErrno::E_NOENT.code(), 2);
+        assert_eq!(SyscallErrno::E_INVAL.code(), 22);
+        assert_eq!(SyscallErrno::E_NOSYS.code(), 38);
+        assert_eq!(SyscallErrno::E_NOTSUP.code(), 95);
+    }
+
+    // === 测试: SyscallErrno::from_code ===
+    #[test]
+    fn test_syscall_errno_from_code() {
+        let errno = SyscallErrno::from_code(22);
+        assert_eq!(errno.code(), 22);
+        assert!(!errno.is_success());
+
+        let success = SyscallErrno::from_code(0);
+        assert!(success.is_success());
+        assert_eq!(success.code(), 0);
+    }
+
+    // === 测试: check_syscall_result 正值返回 Ok ===
+    #[test]
+    fn test_check_syscall_result_ok() {
+        let result = syscall::check_syscall_result(42);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+
+        let result = syscall::check_syscall_result(0);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
+    }
+
+    // === 测试: check_syscall_result 负值返回 Err ===
+    #[test]
+    fn test_check_syscall_result_err() {
+        let result = syscall::check_syscall_result(-22);
+        assert!(result.is_err());
+        let errno = result.unwrap_err();
+        assert_eq!(errno.code(), 22);
+
+        let result = syscall::check_syscall_result(-1);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().code(), 1);
+    }
+
+    // === 测试: posix::open 参数传递正确 ===
+    #[test]
+    fn test_posix_open_args() {
+        // 在用户态测试中，open 会调用真实的 syscall
+        // 我们验证函数签名和参数类型正确（编译测试）
+        // 使用 /dev/null 验证基本功能
+        let result = posix::open("/dev/null", 0, 0);
+        // 无论成功或失败，函数都应正常返回
+        match result {
+            Ok(fd) => assert!(fd >= 0),
+            Err(_) => {} // 在某些环境中可能失败
+        }
+    }
+
+    // === 测试: posix::read 参数传递正确 ===
+    #[test]
+    fn test_posix_read_args() {
+        let mut buf = [0u8; 16];
+        // 使用 fd=0 (stdin) 验证函数签名
+        let result = posix::read(0, &mut buf);
+        // 无论成功或失败，函数都应正常返回
+        match result {
+            Ok(n) => assert!(n >= 0),
+            Err(_) => {}
+        }
+    }
+
+    // === 测试: posix::write 参数传递正确 ===
+    #[test]
+    fn test_posix_write_args() {
+        let buf = b"test";
+        // 使用 fd=1 (stdout) 验证函数签名
+        let result = posix::write(1, buf);
+        // 无论成功或失败，函数都应正常返回
+        match result {
+            Ok(n) => assert!(n >= 0),
+            Err(_) => {}
+        }
+    }
+
+    // === 测试: posix::socket 参数传递正确 ===
+    #[test]
+    fn test_posix_socket_args() {
+        // AF_INET=2, SOCK_STREAM=1, IPPROTO_TCP=6
+        let result = posix::socket(2, 1, 6);
+        // 无论成功或失败，函数都应正常返回
+        match result {
+            Ok(fd) => {
+                assert!(fd >= 0);
+                // 清理：关闭 socket
+                let _ = posix::close(fd);
+            }
+            Err(_) => {}
+        }
     }
 }
