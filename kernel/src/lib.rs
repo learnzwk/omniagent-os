@@ -3,7 +3,10 @@
 #[cfg(not(test))]
 use core::panic::PanicInfo;
 
+pub mod boot;
 pub mod vga;
+pub mod drivers;
+pub mod arch;
 
 #[cfg(not(test))]
 #[panic_handler]
