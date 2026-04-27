@@ -110,14 +110,13 @@ impl log::Log for SerialLogger {
             Level::Trace => "\x1b[90m",
         };
         let reset = "\x1b[0m";
-        let msg = format!(
-            "{}[{:>5}] {}{}\x1b[0m\n",
-            color,
-            record.level(),
-            record.args(),
-            reset,
-        );
-        SERIAL.lock().write_str(&msg);
+        use core::fmt::Write;
+        let mut serial = SERIAL.lock();
+        let _ = serial.write_str(color);
+        let _ = write!(serial, "[{:>5}] ", record.level());
+        let _ = write!(serial, "{}", record.args());
+        let _ = serial.write_str(reset);
+        let _ = serial.write_str("\n");
     }
 
     fn flush(&self) {}

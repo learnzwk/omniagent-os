@@ -106,14 +106,15 @@ impl GdtPointer {
 #[cfg(not(test))]
 pub unsafe fn load_gdt() {
     let pointer = GdtPointer::new();
+    let kernel_sel: u64 = KERNEL_CODE_SELECTOR as u64;
     core::arch::asm!(
-        "lgdt [{}]",
-        "push {kernel_sel}",
-        "lea {1:f}, [rip + 2]",
-        "push QWORD PTR [rsp]",
+        "lgdt [{0}]",
+        "push {1}",
+        "lea rax, [rip + 2]",
+        "push rax",
         "retfq",
         in(reg) &pointer,
-        kernel_sel = const KERNEL_CODE_SELECTOR,
+        in(reg) kernel_sel,
         options(nostack),
     );
 }
