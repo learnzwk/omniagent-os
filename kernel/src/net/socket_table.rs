@@ -53,8 +53,8 @@ impl SocketTable {
     /// 创建新的 Socket 表
     pub fn new() -> Self {
         SocketTable {
-            metas: spin::Mutex::new([const { None }; MAX_SOCKETS]),
-            protocols: [const { spin::Mutex::new(None) }; MAX_SOCKETS],
+            metas: spin::Mutex::new(core::array::from_fn(|_| None)),
+            protocols: core::array::from_fn(|_| spin::Mutex::new(None)),
             next_fd: spin::Mutex::new(0),
         }
     }

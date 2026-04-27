@@ -22,6 +22,17 @@ pub mod scheduler;
 pub mod fs;
 pub mod net;
 pub mod security;
+pub mod softbus;
+pub mod ipc;
+pub mod service;
+pub mod capability;
+pub mod svc_manager;
+pub mod device_manager;
+pub mod bitmap_scheduler;
+pub mod logger;
+pub mod config;
+pub mod package;
+pub mod shell;
 
 #[cfg(not(test))]
 #[panic_handler]

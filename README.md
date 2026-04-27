@@ -9,9 +9,9 @@
   <img src="https://img.shields.io/badge/Rust-1.95-orange?logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/Architecture-x86__64-blue" alt="x86_64">
   <img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-green" alt="License">
-  <img src="https://img.shields.io/badge/Tests-1260%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1705%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Crates-18%20(1%20kernel%20%2B%2017%20userspace)-yellow" alt="Crates">
-  <img src="https://img.shields.io/badge/Code-47K%20lines-yellow" alt="Code">
+  <img src="https://img.shields.io/badge/Code-60K%20lines-yellow" alt="Code">
 </p>
 
 ---
@@ -24,12 +24,23 @@ OmniAgent OS 是一个以 **Agent 为第一公民** 的微内核操作系统，�
 - **Slab 分配器** — 替换 bump allocator，支持对象级高效内存复用
 - **虚拟内存管理** — 4 级页表 (PML4)，支持映射/取消映射/权限控制
 - **CFS 调度器** — 完全公平调度器变体，5 级优先级，红黑树就绪队列
+- **位图调度器** — 32 级优先级位图，CLZ O(1) 任务选择
+- **分布式 SoftBus** — 设备发现/连接管理/传输层，HarmonyOS DSoftBus 思想
 - **Agent 原生** — 17 个专用系统调用 (512-528)，Agent 作为内核一等公民管理
-- **零拷贝 IPC** — 64 字节 `#[repr(C)]` 消息头，支持同步/异步/广播/零拷贝传输
+- **零拷贝 IPC** — 共享内存池 + 64 字节 `#[repr(C)]` 消息头，同步/异步/广播/零拷贝
+- **原子服务框架** — 服务注册/发现/生命周期管理，8 种服务类型
+- **能力令牌系统** — 令牌委托/撤销/继承，细粒度权限控制
 - **内核文件系统** — VFS 层 + 文件描述符表，支持挂载/目录/文件操作
 - **内核网络层** — TCP/UDP Socket 抽象，网络接口管理
 - **块设备驱动** — 驱动框架 + RAM Disk 实现
 - **安全能力桥接** — CapBitmap 与 Capability 双向映射，细粒度权限控制
+- **地址令牌** — 资源访问控制 + 审计链（哈希链防篡改）
+- **服务管理器** — 服务配置/健康监控/自动重启
+- **设备管理器** — 设备描述/驱动匹配/9 种设备类型
+- **系统日志** — 6 级日志 + 环形缓冲区 + 多目标输出 + 模块过滤
+- **配置管理** — 多命名空间 + 热重载 + 变更回调 + 快照回滚
+- **包管理器** — 语义化版本 + 依赖拓扑排序 + 循环检测 + 冲突检测
+- **Shell 命令行** — 命令解析 + 管道 + 重定向 + 8 个内置命令 + 别名 + 历史记录
 - **POSIX 兼容** — 35+ POSIX syscall 实现，标准应用程序兼容
 - **多模态 AI** — 本地模型 (Candle/ONNX) + 云端 API (OpenAI/Anthropic) 双通道
 - **自动化引擎** — DAG 任务调度、工作流编排、触发器系统
@@ -61,7 +72,18 @@ omniagent-os/
 │       ├── scheduler/               # CFS 调度器 (5 级优先级)
 │       ├── fs/                      # 内核 VFS + 文件描述符表
 │       ├── net/                     # 内核网络层 (TCP/UDP Socket)
-│       ├── security/                # 安全能力桥接 (CapBitmap ↔ Capability)
+│       ├── security/                # 安全能力桥接 + 地址令牌 + 审计链
+│       ├── softbus/                  # 分布式 SoftBus (DSoftBus 思想)
+│       ├── ipc/                      # 零拷贝 IPC + 共享内存池
+│       ├── service/                  # 原子服务框架 (注册/发现/生命周期)
+│       ├── capability/               # 能力令牌系统 (委托/撤销/继承)
+│       ├── svc_manager/              # 服务管理器 (配置/健康监控)
+│       ├── device_manager/           # 设备管理器 (设备描述/驱动匹配)
+│       ├── bitmap_scheduler/         # 位图调度器 (32 级优先级)
+│       ├── logger/                   # 系统日志服务 (环形缓冲区/多目标)
+│       ├── config/                   # 配置管理服务 (热重载/快照)
+│       ├── package/                  # 包管理器 (依赖解析/版本管理)
+│       ├── shell/                    # Shell 命令行 (解析/管道/内置命令)
 │       ├── drivers/                 # 串口 + PS/2 键盘 + 块设备
 │       │   └── block/               # 块设备驱动框架 + RAM Disk
 │       ├── time/                    # PIT 8254 定时器
@@ -134,13 +156,13 @@ make run-debug
 ### 测试
 
 ```bash
-# 运行全部测试 (1260 个)
+# 运行全部测试 (1705 个)
 make test
 
-# 仅用户态 crate 测试 (847 个)
+# 仅用户态 crate 测试 (902 个)
 cargo test --workspace --exclude omniagent-kernel
 
-# 仅内核测试 (413 个)
+# 仅内核测试 (803 个)
 cargo test --target x86_64-unknown-linux-gnu -p omniagent-kernel -- --test-threads=1
 ```
 
@@ -176,9 +198,9 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 | 指标 | 数值 |
 |------|------|
 | 版本 | v0.2.0 |
-| Rust 源文件 | 122 |
-| 代码行数 | 46,854 |
-| 测试函数 | 1,260 (847 用户态 + 413 内核) |
+| Rust 源文件 | 166 |
+| 代码行数 | 59,697 |
+| 测试函数 | 1,705 (803 内核 + 902 用户态) |
 | Crate 数量 | 18 (1 内核 + 17 用户态) |
 | 技术文档 | 43 |
 | Agent Syscall | 17 |
@@ -204,6 +226,9 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 - [x] **P0 内核核心** — Slab 分配器 + 4 级页表虚拟内存 + CFS 调度器 + 5 阶段启动
 - [x] **P1 系统服务** — 内核 VFS + 内核网络层 + libagent syscall 封装 + 安全能力桥接 + 块设备驱动
 - [x] **P2 桌面与 POSIX** — omniagent-desktop 集成层 + Shell UI 组件 + 35+ POSIX syscall
+- [x] **P3 分布式核心** — SoftBus 分布式总线 + 零拷贝 IPC + 原子服务框架 + 能力令牌系统
+- [x] **P4 系统管理** — 服务管理器 + 设备管理器 + 位图调度器 + 安全增强 (地址令牌/审计链)
+- [x] **P5 系统组件** — 系统日志服务 + 配置管理服务 + 包管理器 + Shell 命令行
 
 ## 技术栈
 
@@ -211,11 +236,13 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 |------|------|
 | 内核 | Rust `no_std`, x86_64, Multiboot2, bootloader |
 | 内存 | Slab 分配器, 4 级页表, 物理帧分配器 |
-| 调度 | CFS 变体 (5 级优先级, 红黑树) |
+| 调度 | CFS 变体 (5 级优先级, 红黑树) + 位图调度器 (32 级, CLZ O(1)) |
 | 文件系统 | 内核 VFS, 文件描述符表, AgentFS |
 | 网络 | 内核 TCP/UDP Socket, 网络接口管理 |
-| 驱动 | 块设备框架, RAM Disk, 串口, PS/2 键盘 |
-| 安全 | CapBitmap, Capability, 策略引擎, SHA-256 |
+| 分布式 | SoftBus 分布式总线, CRDT, 向量时钟 |
+| IPC | 零拷贝共享内存池, 同步/异步/广播通道 |
+| 服务 | 原子服务框架, 服务管理器, 设备管理器 |
+| 安全 | CapBitmap, Capability, 能力令牌, 地址令牌, 审计链 |
 | POSIX | 35+ syscall (read/write/open/close/fork/exec/...) |
 | AI 本地 | Candle, ONNX Runtime, tract |
 | AI 云端 | OpenAI API, Anthropic API |
