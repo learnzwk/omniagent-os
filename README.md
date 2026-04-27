@@ -5,11 +5,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Rust-1.75+-orange?logo=rust" alt="Rust">
+  <img src="https://img.shields.io/badge/Rust-1.95-orange?logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/Architecture-x86__64-blue" alt="x86_64">
   <img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-green" alt="License">
-  <img src="https://img.shields.io/badge/Tests-620%20passing-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/Code-23K%20lines-yellow" alt="Code">
+  <img src="https://img.shields.io/badge/Tests-815%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Code-35K%20lines-yellow" alt="Code">
 </p>
 
 ---
@@ -63,7 +63,12 @@ omniagent-os/
 │   ├── omniagent-learning/          # 高级学习系统
 │   ├── omniagent-distributed/       # 分布式服务 (CRDT)
 │   ├── omniagent-shell/             # Aqua Shell 桌面环境
-│   └── omniagent-security/          # 安全子系统
+│   ├── omniagent-security/          # 安全子系统
+│   ├── omniagent-compositor/        # Vulkan 合成器 + GPU 加速
+│   ├── omniagent-inference/         # AI 推理引擎 (本地+云端)
+│   ├── omniagent-virt/              # 虚拟化支持 (KVM)
+│   ├── omniagent-fs/                # 文件系统 (VFS + AgentFS)
+│   └── omniagent-net/               # 网络栈 (TCP/UDP/DNS)
 │
 ├── docs/                            # 技术文档 (39 份)
 │   ├── architecture/                # 系统架构设计
@@ -148,10 +153,10 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 
 | 指标 | 数值 |
 |------|------|
-| Rust 源文件 | 63 |
-| 代码行数 | 23,657 |
-| 测试函数 | 620 |
-| Crate 数量 | 12 (1 内核 + 11 用户态) |
+| Rust 源文件 | 91 |
+| 代码行数 | 35,013 |
+| 测试函数 | 815 |
+| Crate 数量 | 16 (1 内核 + 15 用户态) |
 | 技术文档 | 39 |
 | Agent Syscall | 17 |
 | 支持模态 | 7 (文本/图像/音频/视频/代码/结构化/二进制) |
@@ -168,10 +173,10 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 - [x] **Phase 7A** — 分布式服务 (CRDT)
 - [x] **Phase 7B** — Aqua Shell 桌面框架
 - [x] **Phase 8** — 安全模块
-- [ ] **Phase 9** — Vulkan 合成器 + GPU 加速
-- [ ] **Phase 10** — 真实 AI 模型集成 (Candle/ONNX)
-- [ ] **Phase 11** — 虚拟化支持 (KVM)
-- [ ] **Phase 12** — 文件系统 + 网络栈
+- [x] **Phase 9** — Vulkan 合成器 + GPU 加速框架
+- [x] **Phase 10** — AI 推理引擎 (本地 Candle/ONNX + 云端 OpenAI/Anthropic)
+- [x] **Phase 11** — 虚拟化支持 (KVM/Virtio)
+- [x] **Phase 12** — 文件系统 (VFS/AgentFS) + 网络栈 (TCP/UDP/DNS)
 
 ## 技术栈
 
