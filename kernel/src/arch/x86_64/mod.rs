@@ -1,4 +1,5 @@
 pub mod gdt;
+pub mod idt;
 
 pub const ARCH_NAME: &str = "x86_64";
 pub const PAGE_SIZE: usize = 4096;
