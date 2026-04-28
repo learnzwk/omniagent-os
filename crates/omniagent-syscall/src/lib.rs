@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 /// 传统系统调用号范围 (0-511)
 pub mod traditional {
@@ -88,6 +88,31 @@ impl SyscallResult {
         Self { value }
     }
 }
+
+#[cfg(not(test))]
+impl core::fmt::Display for SyscallResult {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.is_ok() {
+            write!(f, "SyscallResult(ok: {})", self.value)
+        } else {
+            write!(f, "SyscallResult(err: {})", self.value)
+        }
+    }
+}
+
+#[cfg(test)]
+impl std::fmt::Display for SyscallResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_ok() {
+            write!(f, "SyscallResult(ok: {})", self.value)
+        } else {
+            write!(f, "SyscallResult(err: {})", self.value)
+        }
+    }
+}
+
+#[cfg(test)]
+impl std::error::Error for SyscallResult {}
 
 #[cfg(test)]
 mod tests {

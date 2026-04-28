@@ -66,7 +66,7 @@ impl SocketTable {
             SocketType::Datagram => Box::new(UdpSocket::new()),
             SocketType::Raw => {
                 return Err(NetError::ProtocolError {
-                    reason: "Raw Socket 暂不支持",
+                    reason: alloc::string::String::from("Raw Socket 暂不支持"),
                 })
             }
         };
@@ -236,5 +236,169 @@ mod tests {
             NetError::SocketTableFull => {}
             _ => panic!("期望 SocketTableFull 错误"),
         }
+    }
+
+    /// 测试：关闭后重新分配应复用槽位
+    #[test]
+    fn test_socket_table_close_and_realloc() {
+        let table = SocketTable::new();
+
+        // 创建并关闭一个 Socket
+        let fd = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+        table.close(fd).unwrap();
+        assert_eq!(table.count(), 0);
+
+        // 重新创建应成功（槽位被复用）
+        let fd2 = table.create(SocketDomain::Inet, SocketType::Datagram).unwrap();
+        assert!(table.get(fd2).is_ok());
+        assert_eq!(table.count(), 1);
+    }
+
+    /// 测试：查询不存在的 fd 应返回错误
+    #[test]
+    fn test_socket_table_query_nonexistent_fd() {
+        let table = SocketTable::new();
+
+        // 查询从未分配过的 fd
+        let result = table.get(0);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            NetError::InvalidSocket(fd) => assert_eq!(fd, 0),
+            _ => panic!("期望 InvalidSocket 错误"),
+        }
+
+        // 查询 fd = 0
+        let result2 = table.get(1);
+        assert!(result2.is_err());
+    }
+
+    /// 测试：创建 Raw 类型 Socket 应失败
+    #[test]
+    fn test_socket_table_create_raw_unsupported() {
+        let table = SocketTable::new();
+
+        let result = table.create(SocketDomain::Inet, SocketType::Raw);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            NetError::ProtocolError { reason } => {
+                assert!(reason.contains("Raw"), "错误信息应包含 'Raw'");
+            }
+            _ => panic!("期望 ProtocolError 错误"),
+        }
+    }
+
+    /// 测试：创建多种域的 Socket
+    #[test]
+    fn test_socket_table_multiple_domains() {
+        let table = SocketTable::new();
+
+        let fd_inet = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+        let fd_inet6 = table.create(SocketDomain::Inet6, SocketType::Stream).unwrap();
+        let fd_unix = table.create(SocketDomain::Unix, SocketType::Stream).unwrap();
+
+        let entry_inet = table.get(fd_inet).unwrap();
+        assert_eq!(entry_inet.domain, SocketDomain::Inet);
+
+        let entry_inet6 = table.get(fd_inet6).unwrap();
+        assert_eq!(entry_inet6.domain, SocketDomain::Inet6);
+
+        let entry_unix = table.get(fd_unix).unwrap();
+        assert_eq!(entry_unix.domain, SocketDomain::Unix);
+
+        assert_eq!(table.count(), 3);
+    }
+
+    /// 测试：重复关闭同一个 fd 应第二次失败
+    #[test]
+    fn test_socket_table_double_close() {
+        let table = SocketTable::new();
+        let fd = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+
+        // 第一次关闭应成功
+        assert!(table.close(fd).is_ok());
+        // 第二次关闭应失败
+        let result = table.close(fd);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            NetError::InvalidSocket(id) => assert_eq!(id, fd as i32),
+            _ => panic!("期望 InvalidSocket 错误"),
+        }
+    }
+
+    /// 测试：fd 应严格递增
+    #[test]
+    fn test_socket_table_fd_increments() {
+        let table = SocketTable::new();
+
+        let fd0 = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+        let fd1 = table.create(SocketDomain::Inet, SocketType::Datagram).unwrap();
+        let fd2 = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+
+        assert_eq!(fd0, 0);
+        assert_eq!(fd1, 1);
+        assert_eq!(fd2, 2);
+    }
+
+    /// 测试：获取协议 Socket 应成功
+    #[test]
+    fn test_socket_table_get_protocol() {
+        let table = SocketTable::new();
+        let fd = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+
+        let protocol = table.get_protocol(fd);
+        assert!(protocol.is_ok());
+        let guard = protocol.unwrap();
+        assert!(guard.is_some(), "协议 Socket 应存在");
+    }
+
+    /// 测试：获取不存在 fd 的协议 Socket 应失败
+    #[test]
+    fn test_socket_table_get_protocol_invalid() {
+        let table = SocketTable::new();
+
+        let result = table.get_protocol(999);
+        assert!(result.is_err());
+        match result.err().unwrap() {
+            NetError::InvalidSocket(fd) => assert_eq!(fd, 999),
+            _ => panic!("期望 InvalidSocket 错误"),
+        }
+    }
+
+    /// 测试：关闭后协议 Socket 也应被清除
+    #[test]
+    fn test_socket_table_close_clears_protocol() {
+        let table = SocketTable::new();
+        let fd = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+
+        // 关闭前协议 Socket 存在
+        {
+            let protocol = table.get_protocol(fd).unwrap();
+            assert!(protocol.is_some());
+        } // 显式释放 MutexGuard
+
+        // 关闭后
+        table.close(fd).unwrap();
+        let result = table.get_protocol(fd);
+        assert!(result.is_err(), "关闭后获取协议 Socket 应失败");
+    }
+
+    /// 测试：创建和关闭交替操作
+    #[test]
+    fn test_socket_table_create_close_interleaved() {
+        let table = SocketTable::new();
+
+        let fd1 = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+        let fd2 = table.create(SocketDomain::Inet, SocketType::Datagram).unwrap();
+        assert_eq!(table.count(), 2);
+
+        table.close(fd1).unwrap();
+        assert_eq!(table.count(), 1);
+
+        let fd3 = table.create(SocketDomain::Inet, SocketType::Stream).unwrap();
+        assert_eq!(table.count(), 2);
+
+        table.close(fd2).unwrap();
+        table.close(fd3).unwrap();
+        assert_eq!(table.count(), 0);
     }
 }

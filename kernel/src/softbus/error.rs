@@ -4,12 +4,12 @@
 use core::fmt;
 
 /// 软总线错误类型
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SoftBusError {
     /// 设备未找到
     DeviceNotFound(u64),
     /// 连接失败
-    ConnectionFailed { reason: &'static str },
+    ConnectionFailed { reason: alloc::string::String },
     /// 操作超时
     Timeout,
     /// 协议不支持
@@ -74,7 +74,7 @@ mod tests {
         let err = SoftBusError::DeviceNotFound(42);
         assert_eq!(format!("{}", err), "设备未找到: 42");
 
-        let err = SoftBusError::ConnectionFailed { reason: "网络不可达" };
+        let err = SoftBusError::ConnectionFailed { reason: alloc::string::String::from("网络不可达") };
         assert_eq!(format!("{}", err), "连接失败: 网络不可达");
 
         let err = SoftBusError::Timeout;

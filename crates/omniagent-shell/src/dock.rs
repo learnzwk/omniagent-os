@@ -3,6 +3,8 @@
 //! 实现 macOS 风格的 Dock 栏，支持应用图标管理、
 //! 悬停放大效果和点击交互。
 
+use crate::error::ShellError;
+
 /// Dock 项目标识符
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DockItemId(pub u64);
@@ -76,17 +78,17 @@ impl Dock {
     }
 
     /// 添加项目
-    pub fn add_item(&mut self, item: DockItem) -> Result<(), String> {
+    pub fn add_item(&mut self, item: DockItem) -> Result<(), ShellError> {
         // 检查是否已存在相同 ID
         if self.items.iter().any(|i| i.id == item.id) {
-            return Err(format!("Dock 项目已存在: {:?}", item.id));
+            return Err(ShellError::DockError(format!("Dock 项目已存在: {:?}", item.id)));
         }
         self.items.push(item);
         Ok(())
     }
 
     /// 移除项目
-    pub fn remove_item(&mut self, id: DockItemId) -> Result<(), String> {
+    pub fn remove_item(&mut self, id: DockItemId) -> Result<(), ShellError> {
         let len_before = self.items.len();
         self.items.retain(|i| i.id != id);
         if self.items.len() < len_before {
@@ -98,7 +100,7 @@ impl Dock {
             }
             Ok(())
         } else {
-            Err(format!("Dock 项目未找到: {:?}", id))
+            Err(ShellError::DockError(format!("Dock 项目未找到: {:?}", id)))
         }
     }
 

@@ -56,6 +56,16 @@ name = "omniagent-inference"
 version = "0.1.0"
 
 [[package]]
+name = "omniagent-integration-tests"
+version = "0.2.0"
+dependencies = [
+ "libagent",
+ "omniagent-driver",
+ "omniagent-ipc",
+ "omniagent-syscall",
+]
+
+[[package]]
 name = "omniagent-ipc"
 version = "0.1.0"
 

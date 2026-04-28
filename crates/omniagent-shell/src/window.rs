@@ -7,6 +7,12 @@ use crate::rect::Rect;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId(pub u64);
 
+impl std::fmt::Display for WindowId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WindowId({})", self.0)
+    }
+}
+
 /// 窗口状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -21,6 +27,18 @@ pub enum WindowState {
     Fullscreen = 3,
     /// 隐藏
     Hidden = 4,
+}
+
+impl std::fmt::Display for WindowState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WindowState::Normal => write!(f, "Normal"),
+            WindowState::Minimized => write!(f, "Minimized"),
+            WindowState::Maximized => write!(f, "Maximized"),
+            WindowState::Fullscreen => write!(f, "Fullscreen"),
+            WindowState::Hidden => write!(f, "Hidden"),
+        }
+    }
 }
 
 /// 窗口类型

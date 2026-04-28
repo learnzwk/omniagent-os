@@ -314,4 +314,188 @@ mod tests {
         assert!(id2 > id1);
         assert!(id3 > id2);
     }
+
+    /// 测试：TTL 为 0 的消息应被拒绝
+    #[test]
+    fn test_send_zero_ttl_rejected() {
+        let transport = TransportLayer::new();
+
+        let mut msg = make_message(1, 2, MessageType::Data, b"hello");
+        msg.ttl = 0;
+
+        let result = transport.send(msg);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), SoftBusError::InvalidMessage);
+
+        // 错误计数应增加
+        let stats = transport.stats();
+        assert_eq!(stats.errors.load(Ordering::SeqCst), 1);
+
+        // 队列不应有消息
+        assert_eq!(transport.queue_len(), 0);
+    }
+
+    /// 测试：多消息传输 - 发送和接收顺序一致
+    #[test]
+    fn test_multiple_messages_order() {
+        let transport = TransportLayer::new();
+
+        // 发送多条消息
+        transport.send(make_message(1, 2, MessageType::Data, b"first")).unwrap();
+        transport.send(make_message(1, 2, MessageType::Control, b"second")).unwrap();
+        transport.send(make_message(1, 2, MessageType::Heartbeat, b"third")).unwrap();
+
+        // 按顺序接收
+        let msg1 = transport.receive().unwrap();
+        assert_eq!(msg1.payload, Vec::from(b"first"));
+        assert_eq!(msg1.msg_type, MessageType::Data);
+
+        let msg2 = transport.receive().unwrap();
+        assert_eq!(msg2.payload, Vec::from(b"second"));
+        assert_eq!(msg2.msg_type, MessageType::Control);
+
+        let msg3 = transport.receive().unwrap();
+        assert_eq!(msg3.payload, Vec::from(b"third"));
+        assert_eq!(msg3.msg_type, MessageType::Heartbeat);
+
+        // 队列应为空
+        assert!(transport.receive().is_none());
+    }
+
+    /// 测试：统计计数验证 - 发送和接收的字节数
+    #[test]
+    fn test_stats_byte_counting() {
+        let transport = TransportLayer::new();
+
+        // 发送不同大小的消息
+        transport.send(make_message(1, 2, MessageType::Data, b"abc")).unwrap(); // 3 bytes
+        transport.send(make_message(1, 2, MessageType::Data, b"de")).unwrap();  // 2 bytes
+        transport.send(make_message(1, 2, MessageType::Data, b"")).unwrap();    // 0 bytes
+
+        let stats = transport.stats();
+        assert_eq!(stats.messages_sent.load(Ordering::SeqCst), 3);
+        assert_eq!(stats.bytes_sent.load(Ordering::SeqCst), 5);
+
+        // 接收两条消息
+        transport.receive(); // 3 bytes
+        transport.receive(); // 2 bytes
+
+        let stats = transport.stats();
+        assert_eq!(stats.messages_received.load(Ordering::SeqCst), 2);
+        assert_eq!(stats.bytes_received.load(Ordering::SeqCst), 5);
+    }
+
+    /// 测试：空队列 peek 应返回 None
+    #[test]
+    fn test_peek_empty_queue() {
+        let transport = TransportLayer::new();
+
+        let peeked = transport.peek();
+        assert!(peeked.is_none());
+    }
+
+    /// 测试：不同消息类型的传输
+    #[test]
+    fn test_different_message_types() {
+        let transport = TransportLayer::new();
+
+        // 发送各种类型的消息
+        for msg_type in [
+            MessageType::Data,
+            MessageType::Control,
+            MessageType::Discovery,
+            MessageType::Auth,
+            MessageType::Heartbeat,
+            MessageType::Ack,
+        ] {
+            let msg = make_message(1, 2, msg_type, b"test");
+            transport.send(msg).unwrap();
+        }
+
+        // 验证所有消息类型都被正确传输
+        assert_eq!(transport.queue_len(), 6);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Data);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Control);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Discovery);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Auth);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Heartbeat);
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.msg_type, MessageType::Ack);
+    }
+
+    /// 测试：消息优先级和 TTL 字段保留
+    #[test]
+    fn test_message_fields_preserved() {
+        let transport = TransportLayer::new();
+
+        let mut msg = make_message(10, 20, MessageType::Data, b"payload");
+        msg.priority = 200;
+        msg.ttl = 5;
+
+        transport.send(msg).unwrap();
+
+        let received = transport.receive().unwrap();
+        assert_eq!(received.src_device, 10);
+        assert_eq!(received.dst_device, 20);
+        assert_eq!(received.priority, 200);
+        assert_eq!(received.ttl, 5);
+        assert_eq!(received.payload, Vec::from(b"payload"));
+    }
+
+    /// 测试：错误恢复 - TTL=0 后正常消息仍可发送
+    #[test]
+    fn test_error_recovery_after_invalid() {
+        let transport = TransportLayer::new();
+
+        // 发送无效消息
+        let mut msg = make_message(1, 2, MessageType::Data, b"bad");
+        msg.ttl = 0;
+        assert!(transport.send(msg).is_err());
+
+        // 正常消息应仍可发送
+        let good_msg = make_message(1, 2, MessageType::Data, b"good");
+        let result = transport.send(good_msg);
+        assert!(result.is_ok());
+
+        // 验证只有正常消息在队列中
+        assert_eq!(transport.queue_len(), 1);
+        let received = transport.receive().unwrap();
+        assert_eq!(received.payload, Vec::from(b"good"));
+    }
+
+    /// 测试：重置统计后重新计数
+    #[test]
+    fn test_stats_after_reset_and_resend() {
+        let transport = TransportLayer::new();
+
+        // 发送和接收
+        transport.send(make_message(1, 2, MessageType::Data, b"data")).unwrap();
+        transport.receive();
+
+        // 重置
+        transport.reset_stats();
+
+        // 重新发送和接收
+        transport.send(make_message(3, 4, MessageType::Control, b"ctrl")).unwrap();
+        transport.send(make_message(5, 6, MessageType::Data, b"info")).unwrap();
+        transport.receive();
+
+        let stats = transport.stats();
+        assert_eq!(stats.messages_sent.load(Ordering::SeqCst), 2);
+        assert_eq!(stats.messages_received.load(Ordering::SeqCst), 1);
+        assert_eq!(stats.bytes_sent.load(Ordering::SeqCst), 8); // "ctrl" + "info"
+        assert_eq!(stats.bytes_received.load(Ordering::SeqCst), 4); // "ctrl"
+        assert_eq!(stats.errors.load(Ordering::SeqCst), 0);
+    }
 }

@@ -5,7 +5,7 @@
 use core::fmt;
 
 /// Shell 错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ShellError {
     /// 命令未找到
     CommandNotFound(alloc::string::String),

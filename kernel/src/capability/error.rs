@@ -5,7 +5,7 @@
 use core::fmt;
 
 /// 能力错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CapabilityError {
     /// 无效的令牌
     InvalidToken(u64),

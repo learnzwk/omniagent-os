@@ -313,4 +313,163 @@ mod tests {
         manager.disconnect(1).unwrap();
         assert_eq!(manager.connection_count(), 1);
     }
+
+    /// 测试：连接状态转换完整流程
+    #[test]
+    fn test_connection_state_transitions() {
+        let manager = ConnectionManager::new();
+        let conn_id = manager.connect(100, ConnectionType::Tcp).unwrap();
+
+        // 初始状态为 Connecting
+        let conn = manager.get_connection(conn_id).unwrap();
+        assert_eq!(conn.state, ConnectionState::Connecting);
+
+        // Connecting -> Authenticating
+        manager.update_state(conn_id, ConnectionState::Authenticating);
+        let conn = manager.get_connection(conn_id).unwrap();
+        assert_eq!(conn.state, ConnectionState::Authenticating);
+
+        // Authenticating -> Connected
+        manager.update_state(conn_id, ConnectionState::Connected);
+        let conn = manager.get_connection(conn_id).unwrap();
+        assert_eq!(conn.state, ConnectionState::Connected);
+
+        // Connected -> Disconnecting -> 移除
+        manager.update_state(conn_id, ConnectionState::Disconnecting);
+        manager.disconnect(conn_id).unwrap();
+        assert_eq!(manager.connection_count(), 0);
+    }
+
+    /// 测试：同一设备建立多条连接
+    #[test]
+    fn test_multiple_connections_same_peer() {
+        let manager = ConnectionManager::new();
+
+        let conn1 = manager.connect(100, ConnectionType::Tcp).unwrap();
+        let conn2 = manager.connect(100, ConnectionType::Wifi).unwrap();
+        let conn3 = manager.connect(100, ConnectionType::Bluetooth).unwrap();
+
+        assert_eq!(manager.connection_count(), 3);
+
+        // 查询到该设备的连接
+        let conn = manager.get_connection_to(100);
+        assert!(conn.is_some());
+
+        // 断开一条不影响其他
+        manager.disconnect(conn1).unwrap();
+        assert_eq!(manager.connection_count(), 2);
+        assert!(manager.get_connection_to(100).is_some());
+
+        manager.disconnect(conn2).unwrap();
+        assert_eq!(manager.connection_count(), 1);
+
+        manager.disconnect(conn3).unwrap();
+        assert_eq!(manager.connection_count(), 0);
+        assert!(manager.get_connection_to(100).is_none());
+    }
+
+    /// 测试：不同连接类型的连接
+    #[test]
+    fn test_all_connection_types() {
+        let manager = ConnectionManager::new();
+
+        let types = [
+            ConnectionType::Local,
+            ConnectionType::Tcp,
+            ConnectionType::Udp,
+            ConnectionType::SharedMemory,
+            ConnectionType::Bluetooth,
+            ConnectionType::Wifi,
+        ];
+
+        for conn_type in &types {
+            let conn_id = manager.connect(1, *conn_type).unwrap();
+            let conn = manager.get_connection(conn_id).unwrap();
+            assert_eq!(conn.conn_type, *conn_type);
+        }
+
+        assert_eq!(manager.connection_count(), types.len());
+    }
+
+    /// 测试：select_best_connection 只选择 Connected 状态的连接
+    #[test]
+    fn test_select_best_only_connected() {
+        let manager = ConnectionManager::new();
+
+        let conn1 = manager.connect(100, ConnectionType::Tcp).unwrap();
+        let conn2 = manager.connect(100, ConnectionType::Wifi).unwrap();
+
+        // 两条连接都不是 Connected 状态
+        manager.update_latency(conn1, 50);
+        manager.update_latency(conn2, 10);
+
+        // 没有已连接的连接，应返回 None
+        let best = manager.select_best_connection(100);
+        assert!(best.is_none());
+
+        // 将 conn2 设为 Connected
+        manager.update_state(conn2, ConnectionState::Connected);
+        let best = manager.select_best_connection(100).unwrap();
+        assert_eq!(best.connection_id, conn2);
+    }
+
+    /// 测试：连接 ID 严格递增
+    #[test]
+    fn test_connection_id_increments() {
+        let manager = ConnectionManager::new();
+
+        let id1 = manager.connect(1, ConnectionType::Tcp).unwrap();
+        let id2 = manager.connect(2, ConnectionType::Udp).unwrap();
+        let id3 = manager.connect(3, ConnectionType::Wifi).unwrap();
+
+        assert_eq!(id1, 1);
+        assert_eq!(id2, 2);
+        assert_eq!(id3, 3);
+    }
+
+    /// 测试：断开不存在的连接应返回错误
+    #[test]
+    fn test_disconnect_nonexistent() {
+        let manager = ConnectionManager::new();
+
+        let result = manager.disconnect(999);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), SoftBusError::NotConnected);
+    }
+
+    /// 测试：更新不存在连接的状态不应 panic
+    #[test]
+    fn test_update_state_nonexistent() {
+        let manager = ConnectionManager::new();
+
+        // 对不存在的连接更新状态不应 panic
+        manager.update_state(999, ConnectionState::Connected);
+        manager.update_latency(999, 100);
+    }
+
+    /// 测试：查询不存在设备的连接应返回 None
+    #[test]
+    fn test_get_connection_to_nonexistent() {
+        let manager = ConnectionManager::new();
+
+        let result = manager.get_connection_to(999);
+        assert!(result.is_none());
+    }
+
+    /// 测试：连接信息字段验证
+    #[test]
+    fn test_connection_info_fields() {
+        let manager = ConnectionManager::new();
+        let conn_id = manager.connect(42, ConnectionType::Bluetooth).unwrap();
+
+        let conn = manager.get_connection(conn_id).unwrap();
+        assert_eq!(conn.connection_id, conn_id);
+        assert_eq!(conn.peer_device_id, 42);
+        assert_eq!(conn.conn_type, ConnectionType::Bluetooth);
+        assert_eq!(conn.state, ConnectionState::Connecting);
+        assert_eq!(conn.latency_us, 0);
+        assert_eq!(conn.bandwidth, 0);
+        assert_eq!(conn.created_at, 1000);
+        assert_eq!(conn.last_active, 1000);
+    }
 }

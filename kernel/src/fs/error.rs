@@ -6,7 +6,7 @@
 use core::fmt;
 
 /// 文件系统错误类型
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FsError {
     /// 文件或目录未找到
     NotFound,
@@ -35,7 +35,7 @@ pub enum FsError {
     /// I/O 错误
     IoError {
         /// 错误原因描述
-        reason: &'static str,
+        reason: alloc::string::String,
     },
     /// 无效的偏移量
     InvalidOffset,
@@ -84,7 +84,7 @@ mod tests {
         assert_eq!(format!("{}", FsError::FdTableFull), "文件描述符表已满");
         assert_eq!(format!("{}", FsError::NotOpen), "文件未打开");
         assert_eq!(
-            format!("{}", FsError::IoError { reason: "设备错误" }),
+            format!("{}", FsError::IoError { reason: alloc::string::String::from("设备错误") }),
             "I/O 错误: 设备错误"
         );
         assert_eq!(format!("{}", FsError::InvalidOffset), "无效的偏移量");
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_error_debug() {
-        let err = FsError::IoError { reason: "测试" };
+        let err = FsError::IoError { reason: alloc::string::String::from("测试") };
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("IoError"));
         assert!(debug_str.contains("测试"));

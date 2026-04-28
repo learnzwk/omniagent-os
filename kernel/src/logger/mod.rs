@@ -7,3 +7,7 @@ pub mod error;
 pub mod sink;
 pub mod record;
 pub mod manager;
+
+pub use manager::LogManager;
+pub use record::{LogLevel, LogRecord};
+pub use sink::{LogSink, RingBufferSink, VgaSink, MultiSink, SinkFilter};

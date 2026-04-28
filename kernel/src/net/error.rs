@@ -3,7 +3,7 @@
 use core::fmt;
 
 /// 网络层错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetError {
     /// 无效地址
     InvalidAddress,
@@ -26,7 +26,7 @@ pub enum NetError {
     /// Socket 表已满
     SocketTableFull,
     /// 协议错误
-    ProtocolError { reason: &'static str },
+    ProtocolError { reason: alloc::string::String },
     /// 缓冲区太小
     BufferTooSmall,
     /// 没有路由
@@ -71,7 +71,7 @@ mod tests {
         let err = NetError::InvalidSocket(42);
         assert_eq!(format!("{}", err), "无效的 Socket 文件描述符: 42");
 
-        let err = NetError::ProtocolError { reason: "无效包头" };
+        let err = NetError::ProtocolError { reason: alloc::string::String::from("无效包头") };
         assert_eq!(format!("{}", err), "协议错误: 无效包头");
     }
 }

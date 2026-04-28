@@ -6,10 +6,10 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-v0.2.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/Rust-1.95-orange?logo=rust" alt="Rust">
+  <img src="https://img.shields.io/badge/Rust-1.75-orange?logo=rust" alt="Rust">
   <img src="https://img.shields.io/badge/Architecture-x86__64-blue" alt="x86_64">
   <img src="https://img.shields.io/badge/License-MIT%2FApache--2.0-green" alt="License">
-  <img src="https://img.shields.io/badge/Tests-1705%20passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1781%20passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Crates-18%20(1%20kernel%20%2B%2017%20userspace)-yellow" alt="Crates">
   <img src="https://img.shields.io/badge/Code-60K%20lines-yellow" alt="Code">
 </p>
@@ -156,13 +156,13 @@ make run-debug
 ### 测试
 
 ```bash
-# 运行全部测试 (1705 个)
+# 运行全部测试 (1781 个)
 make test
 
-# 仅用户态 crate 测试 (902 个)
-cargo test --workspace --exclude omniagent-kernel
+# 仅用户态 crate 测试 (907 个)
+cargo test --workspace --exclude omniagent-kernel --target x86_64-unknown-linux-gnu
 
-# 仅内核测试 (803 个)
+# 仅内核测试 (874 个)
 cargo test --target x86_64-unknown-linux-gnu -p omniagent-kernel -- --test-threads=1
 ```
 
@@ -200,7 +200,7 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 | 版本 | v0.2.0 |
 | Rust 源文件 | 166 |
 | 代码行数 | 59,697 |
-| 测试函数 | 1,705 (803 内核 + 902 用户态) |
+| 测试函数 | 1,781 (874 内核 + 907 用户态) |
 | Crate 数量 | 18 (1 内核 + 17 用户态) |
 | 技术文档 | 43 |
 | Agent Syscall | 17 |
@@ -229,6 +229,7 @@ OmniAgent OS 为 Agent 提供了 17 个专用系统调用 (编号 512-528)：
 - [x] **P3 分布式核心** — SoftBus 分布式总线 + 零拷贝 IPC + 原子服务框架 + 能力令牌系统
 - [x] **P4 系统管理** — 服务管理器 + 设备管理器 + 位图调度器 + 安全增强 (地址令牌/审计链)
 - [x] **P5 系统组件** — 系统日志服务 + 配置管理服务 + 包管理器 + Shell 命令行
+- [x] **P6 质量审查** — 构建系统修复 + 代码质量提升 + 测试补充 + CI 优化 + 文档更新
 
 ## 技术栈
 

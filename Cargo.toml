@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["kernel", "crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent", "crates/omniagent-automation", "crates/omniagent-memory", "crates/omniagent-learning", "crates/omniagent-multimodal", "crates/omniagent-shell", "crates/omniagent-distributed", "crates/omniagent-security", "crates/omniagent-compositor", "crates/omniagent-inference", "crates/omniagent-virt", "crates/omniagent-fs", "crates/omniagent-net", "crates/omniagent-desktop"]
+members = ["kernel", "crates/omniagent-syscall", "crates/omniagent-ipc", "crates/omniagent-driver", "crates/libagent", "crates/omniagent-automation", "crates/omniagent-memory", "crates/omniagent-learning", "crates/omniagent-multimodal", "crates/omniagent-shell", "crates/omniagent-distributed", "crates/omniagent-security", "crates/omniagent-compositor", "crates/omniagent-inference", "crates/omniagent-virt", "crates/omniagent-fs", "crates/omniagent-net", "crates/omniagent-desktop", "tests/integration"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -14,9 +14,7 @@ omniagent-driver = { path = "crates/omniagent-driver" }
 libagent = { path = "crates/libagent" }
 bitflags = "2.5"
 spin = "0.9"
-volatile = "0.5"
 log = "0.4"
-serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [profile.dev]
 panic = "abort"

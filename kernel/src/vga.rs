@@ -83,7 +83,7 @@ impl VgaWriter {
     }
 
     /// 写入字符串
-    pub fn write_str(&mut self, s: &str) {
+    pub fn write_bytes(&mut self, s: &str) {
         for byte in s.bytes() {
             self.write_byte(byte);
         }
@@ -101,7 +101,7 @@ impl VgaWriter {
             character: b' ',
             color_code: self.color_code,
         };
-        for row in &mut self.buffer.iter_mut() {
+        for row in self.buffer.iter_mut() {
             for col in row.iter_mut() {
                 *col = blank;
             }
@@ -112,7 +112,7 @@ impl VgaWriter {
 
 impl fmt::Write for VgaWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_str(s);
+        self.write_bytes(s);
         Ok(())
     }
 }

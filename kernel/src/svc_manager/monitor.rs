@@ -299,4 +299,160 @@ mod tests {
         assert_eq!(unhealthy.len(), 1);
         assert!(unhealthy.contains(&2));
     }
+
+    /// 测试：连续失败计数达到阈值后标记不健康
+    #[test]
+    fn test_consecutive_failures_threshold() {
+        let config = HealthCheckConfig {
+            check_interval_ms: 1000,
+            timeout_ms: 500,
+            max_failures: 5,
+        };
+        let monitor = HealthMonitor::new();
+        monitor.register(1, config);
+
+        // 前 4 次失败不应标记为不健康
+        for _ in 0..4 {
+            monitor.record_failure(1);
+            assert_ne!(monitor.get_health(1), HealthStatus::Unhealthy);
+        }
+
+        // 第 5 次失败应标记为不健康
+        monitor.record_failure(1);
+        assert_eq!(monitor.get_health(1), HealthStatus::Unhealthy);
+        assert!(monitor.should_restart(1));
+    }
+
+    /// 测试：恢复后状态重置 - 成功后失败计数应从零开始
+    #[test]
+    fn test_recovery_resets_failure_count() {
+        let config = HealthCheckConfig {
+            check_interval_ms: 1000,
+            timeout_ms: 500,
+            max_failures: 2,
+        };
+        let monitor = HealthMonitor::new();
+        monitor.register(1, config);
+
+        // 记录 1 次失败
+        monitor.record_failure(1);
+
+        // 恢复成功
+        monitor.record_success(1);
+        assert_eq!(monitor.get_health(1), HealthStatus::Healthy);
+
+        // 再失败 1 次不应标记为不健康（因为计数已重置）
+        monitor.record_failure(1);
+        assert_ne!(monitor.get_health(1), HealthStatus::Unhealthy);
+
+        // 再失败 1 次才应标记为不健康
+        monitor.record_failure(1);
+        assert_eq!(monitor.get_health(1), HealthStatus::Unhealthy);
+    }
+
+    /// 测试：未注册服务的默认行为
+    #[test]
+    fn test_unregistered_service_defaults() {
+        let monitor = HealthMonitor::new();
+
+        // 未注册的服务应返回 Unknown 状态
+        assert_eq!(monitor.get_health(999), HealthStatus::Unknown);
+        assert!(!monitor.should_restart(999));
+
+        // 对未注册服务记录失败不应 panic
+        monitor.record_failure(999);
+
+        // 对未注册服务记录成功不应 panic
+        monitor.record_success(999);
+    }
+
+    /// 测试：多服务同时监控
+    #[test]
+    fn test_multiple_services_monitoring() {
+        let monitor = HealthMonitor::new();
+        monitor.register(1, default_config());
+        monitor.register(2, default_config());
+        monitor.register(3, default_config());
+
+        // 服务 1 健康
+        monitor.record_success(1);
+        assert_eq!(monitor.get_health(1), HealthStatus::Healthy);
+
+        // 服务 2 不健康
+        monitor.record_failure(2);
+        monitor.record_failure(2);
+        monitor.record_failure(2);
+        assert_eq!(monitor.get_health(2), HealthStatus::Unhealthy);
+
+        // 服务 3 降级
+        monitor.report_health(3, HealthStatus::Degraded);
+        assert_eq!(monitor.get_health(3), HealthStatus::Degraded);
+
+        // 验证各服务状态互不影响
+        assert_eq!(monitor.get_health(1), HealthStatus::Healthy);
+        assert_eq!(monitor.get_health(2), HealthStatus::Unhealthy);
+        assert_eq!(monitor.get_health(3), HealthStatus::Degraded);
+
+        // 列出不健康服务
+        let unhealthy = monitor.list_unhealthy();
+        assert_eq!(unhealthy.len(), 1);
+        assert!(unhealthy.contains(&2));
+    }
+
+    /// 测试：自定义超时配置
+    #[test]
+    fn test_custom_config() {
+        let config = HealthCheckConfig {
+            check_interval_ms: 100,
+            timeout_ms: 50,
+            max_failures: 1,
+        };
+        let monitor = HealthMonitor::new();
+        monitor.register(42, config);
+
+        // max_failures = 1，一次失败就应标记为不健康
+        monitor.record_failure(42);
+        assert_eq!(monitor.get_health(42), HealthStatus::Unhealthy);
+    }
+
+    /// 测试：多次注册同一服务应覆盖配置
+    #[test]
+    fn test_reregister_service() {
+        let config1 = HealthCheckConfig {
+            check_interval_ms: 1000,
+            timeout_ms: 500,
+            max_failures: 5,
+        };
+        let config2 = HealthCheckConfig {
+            check_interval_ms: 2000,
+            timeout_ms: 1000,
+            max_failures: 1,
+        };
+
+        let monitor = HealthMonitor::new();
+        monitor.register(1, config1);
+
+        // 先用 config1 记录失败
+        monitor.record_failure(1);
+        assert_ne!(monitor.get_health(1), HealthStatus::Unhealthy);
+
+        // 重新注册为 config2
+        monitor.register(1, config2);
+
+        // 重置后状态应为 Unknown
+        assert_eq!(monitor.get_health(1), HealthStatus::Unknown);
+
+        // 用 config2 (max_failures=1) 记录一次失败就应不健康
+        monitor.record_failure(1);
+        assert_eq!(monitor.get_health(1), HealthStatus::Unhealthy);
+    }
+
+    /// 测试：健康状态 Display 输出
+    #[test]
+    fn test_health_status_display() {
+        assert_eq!(format!("{}", HealthStatus::Healthy), "健康");
+        assert_eq!(format!("{}", HealthStatus::Degraded), "降级");
+        assert_eq!(format!("{}", HealthStatus::Unhealthy), "不健康");
+        assert_eq!(format!("{}", HealthStatus::Unknown), "未知");
+    }
 }

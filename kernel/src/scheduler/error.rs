@@ -9,7 +9,7 @@ use core::fmt;
 ///
 /// 涵盖任务管理、状态转换、运行队列操作和上下文切换等场景中
 /// 可能出现的所有错误情况。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SchedulerError {
     /// 无效的任务 ID
     InvalidTaskId(u64),
@@ -35,7 +35,7 @@ pub enum SchedulerError {
     /// 上下文切换失败
     ContextSwitchFailed {
         /// 失败原因
-        reason: &'static str,
+        reason: alloc::string::String,
     },
     /// 无效的优先级类
     InvalidPriorityClass(u8),

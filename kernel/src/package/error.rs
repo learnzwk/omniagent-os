@@ -5,7 +5,7 @@
 use core::fmt;
 
 /// 包管理器错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PackageError {
     /// 包未找到
     PackageNotFound(alloc::string::String),

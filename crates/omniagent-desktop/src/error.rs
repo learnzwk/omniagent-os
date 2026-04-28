@@ -8,9 +8,9 @@ pub enum DesktopError {
     /// 无效的窗口 ID
     InvalidWindowId,
     /// 渲染失败
-    RenderFailed { reason: &'static str },
+    RenderFailed { reason: String },
     /// 动画错误
-    AnimationError { reason: &'static str },
+    AnimationError { reason: String },
     /// 主题未找到
     ThemeNotFound(String),
     /// 无效的渲染表面

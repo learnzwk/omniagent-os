@@ -8,4 +8,5 @@ pub mod ramdisk;
 
 pub use device::{BlockDevice, BlockError, BlockDeviceInfo};
 pub use manager::BlockDeviceManager;
+pub use manager::BLOCK_MANAGER;
 pub use ramdisk::RamDisk;

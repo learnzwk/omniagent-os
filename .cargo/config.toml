@@ -13,10 +13,4 @@ rustflags = [
     "-C", "panic=abort",
 ]
 
-[target.aarch64-unknown-none]
-linker = "aarch64-linux-gnu-gcc"
-rustflags = [
-    "-C", "link-arg=-Tkernel/src/arch/aarch64/linker.ld",
-    "-C", "target-feature=+strict-align",
-    "-C", "panic=abort",
-]
+

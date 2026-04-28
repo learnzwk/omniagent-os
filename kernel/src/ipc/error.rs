@@ -4,7 +4,7 @@
 use core::fmt;
 
 /// IPC 错误类型
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IpcError {
     /// 内存不足
     OutOfMemory,

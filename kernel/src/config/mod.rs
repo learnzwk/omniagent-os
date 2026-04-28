@@ -6,3 +6,6 @@
 pub mod error;
 pub mod store;
 pub mod manager;
+
+pub use store::{ConfigStore, ConfigValue};
+pub use manager::ConfigManager;

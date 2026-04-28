@@ -164,14 +164,14 @@ impl ProtocolSocket for TcpSocket {
     /// TCP Socket 不支持 send_to
     fn send_to(&mut self, _data: &[u8], _addr: SocketAddr) -> Result<usize, NetError> {
         Err(NetError::ProtocolError {
-            reason: "TCP Socket 不支持 send_to",
+            reason: "TCP Socket 不支持 send_to".to_string(),
         })
     }
 
     /// TCP Socket 不支持 recv_from
     fn recv_from(&mut self, _buf: &mut [u8]) -> Result<(usize, SocketAddr), NetError> {
         Err(NetError::ProtocolError {
-            reason: "TCP Socket 不支持 recv_from",
+            reason: "TCP Socket 不支持 recv_from".to_string(),
         })
     }
 
@@ -261,7 +261,7 @@ impl ProtocolSocket for UdpSocket {
     /// UDP Socket 不支持 connect
     fn connect(&mut self, _addr: SocketAddr) -> Result<(), NetError> {
         Err(NetError::ProtocolError {
-            reason: "UDP Socket 不支持 connect",
+            reason: "UDP Socket 不支持 connect".to_string(),
         })
     }
 
@@ -296,21 +296,21 @@ impl ProtocolSocket for UdpSocket {
     /// UDP Socket 不支持 listen
     fn listen(&mut self, _backlog: u32) -> Result<(), NetError> {
         Err(NetError::ProtocolError {
-            reason: "UDP Socket 不支持 listen",
+            reason: "UDP Socket 不支持 listen".to_string(),
         })
     }
 
     /// UDP Socket 不支持 accept
     fn accept(&mut self) -> Result<(Box<dyn ProtocolSocket>, SocketAddr), NetError> {
         Err(NetError::ProtocolError {
-            reason: "UDP Socket 不支持 accept",
+            reason: "UDP Socket 不支持 accept".to_string(),
         })
     }
 
     /// UDP Socket 不支持 shutdown
     fn shutdown(&mut self, _how: ShutdownHow) -> Result<(), NetError> {
         Err(NetError::ProtocolError {
-            reason: "UDP Socket 不支持 shutdown",
+            reason: "UDP Socket 不支持 shutdown".to_string(),
         })
     }
 

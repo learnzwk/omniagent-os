@@ -33,14 +33,14 @@ fn test_driver_ipc_compat() {
 /// 测试 libagent 和 syscall 定义的互操作性
 #[test]
 fn test_libagent_syscall_compat() {
-    use libagent::{AgentConfig, AgentId, AgentType};
+    use libagent::{AgentConfig, AgentType};
     use omniagent_syscall::agent;
 
     // 验证 Agent 配置可以与 syscall 定义配合使用
-    let config = AgentConfig::new("test-agent")
-        .with_type(AgentType::Expert);
+    let mut config = AgentConfig::new("test-agent");
+    config.agent_type = AgentType::AIInference;
     assert_eq!(config.name, "test-agent");
-    assert_eq!(config.agent_type, AgentType::Expert);
+    assert_eq!(config.agent_type, AgentType::AIInference);
 
     // 验证 Agent syscall 号范围正确
     assert!(agent::SYS_AGENT_SPAWN >= 512);
@@ -49,12 +49,12 @@ fn test_libagent_syscall_compat() {
 /// 测试 libagent 和 IPC 类型的互操作性
 #[test]
 fn test_libagent_ipc_compat() {
-    use libagent::{AgentId, AgentMessage};
+    use libagent::{AgentHandle, AgentMessage};
     use omniagent_ipc::MessageHeader;
 
     // 验证 Agent 消息可以映射到 IPC 消息头
-    let msg = AgentMessage::new(AgentId::new(1), AgentId::new(2), "test");
-    let hdr = MessageHeader::request(msg.from.0 as u32, msg.to.0 as u32);
+    let msg = AgentMessage::new(1, AgentHandle::new(2), b"test".to_vec());
+    let hdr = MessageHeader::request(msg.msg_id as u32, msg.src.as_u64() as u32);
     assert_eq!(hdr.src_port, 1);
     assert_eq!(hdr.dst_port, 2);
 }
@@ -62,16 +62,15 @@ fn test_libagent_ipc_compat() {
 /// 测试全链路类型兼容性
 #[test]
 fn test_full_chain_compat() {
-    use libagent::{AgentBuilder, AgentType, AgentPriority};
+    use libagent::{AgentConfig, AgentType, AgentPriority};
     use omniagent_ipc::{ChannelId, IpcError, MessageHeader, MessageType, PortId};
     use omniagent_syscall::agent;
     use omniagent_driver::{DeviceDriver, DeviceType, DriverId};
 
     // 创建 Agent 配置
-    let config = AgentBuilder::new("fullchain-test")
-        .agent_type(AgentType::Service)
-        .priority(AgentPriority::High)
-        .build();
+    let mut config = AgentConfig::new("fullchain-test");
+    config.agent_type = AgentType::System;
+    config.priority = AgentPriority::High;
 
     // 创建 IPC 消息头
     let hdr = MessageHeader::request(1, 2);
@@ -85,5 +84,5 @@ fn test_full_chain_compat() {
     let _syscall = agent::SYS_AGENT_SPAWN;
     let _error = IpcError::ChannelNotFound;
 
-    assert_eq!(config.agent_type, AgentType::Service);
+    assert_eq!(config.agent_type, AgentType::System);
 }

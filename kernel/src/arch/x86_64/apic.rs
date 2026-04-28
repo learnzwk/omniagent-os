@@ -1,6 +1,7 @@
 //! Local APIC 驱动
 
 use crate::drivers::serial::SERIAL;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 /// Local APIC MSR 寄存器
 const APIC_MSR: u32 = 0x1B;
@@ -22,7 +23,7 @@ const APIC_DEFAULT_BASE: u64 = 0xFEE00000;
 const SPURIOUS_VECTOR: u8 = 0xFF;
 
 /// 全局 APIC 基地址
-static mut APIC_BASE: u64 = APIC_DEFAULT_BASE;
+static APIC_BASE: AtomicU64 = AtomicU64::new(APIC_DEFAULT_BASE);
 
 /// 初始化 Local APIC
 pub unsafe fn init_local_apic() {
@@ -31,7 +32,7 @@ pub unsafe fn init_local_apic() {
     core::arch::asm!("rdmsr", out("eax") msr_value, options(nomem, nostack, preserves_flags));
     let apic_enabled = (msr_value & (1 << 11)) != 0;
     let base = msr_value & 0xFFFF_F000;
-    APIC_BASE = base;
+    APIC_BASE.store(base, Ordering::SeqCst);
 
     if !apic_enabled {
         // 启用 APIC
@@ -52,13 +53,13 @@ pub unsafe fn send_eoi() {
 
 /// 读取 APIC 寄存器
 unsafe fn read_apic(offset: usize) -> u32 {
-    let addr = APIC_BASE + offset as u64;
+    let addr = APIC_BASE.load(Ordering::SeqCst) + offset as u64;
     core::ptr::read_volatile(addr as *const u32)
 }
 
 /// 写入 APIC 寄存器
 unsafe fn write_apic(offset: usize, value: u32) {
-    let addr = APIC_BASE + offset as u64;
+    let addr = APIC_BASE.load(Ordering::SeqCst) + offset as u64;
     core::ptr::write_volatile(addr as *mut u32, value);
 }
 
@@ -104,5 +105,45 @@ mod tests {
             let vec = crate::arch::x86_64::pic::irq_to_vector(irq);
             assert!(vec >= 32 && vec <= 47);
         }
+    }
+
+    /// 测试：APIC 寄存器偏移量验证
+    #[test]
+    fn test_apic_all_register_offsets() {
+        assert_eq!(APIC_ID, 0x020);
+        assert_eq!(APIC_VERSION, 0x030);
+        assert_eq!(APIC_EOI, 0x0B0);
+        assert_eq!(APIC_SVR, 0x0F0);
+        assert_eq!(APIC_TIMER_LVT, 0x320);
+        assert_eq!(APIC_TIMER_INITIAL, 0x380);
+        assert_eq!(APIC_TIMER_CURRENT, 0x390);
+        assert_eq!(APIC_TIMER_DIV, 0x3E0);
+    }
+
+    /// 测试：APIC 寄存器偏移量递增关系
+    #[test]
+    fn test_apic_register_ordering() {
+        // 寄存器偏移量应递增
+        assert!(APIC_ID < APIC_VERSION);
+        assert!(APIC_VERSION < APIC_EOI);
+        assert!(APIC_EOI < APIC_SVR);
+        assert!(APIC_SVR < APIC_TIMER_LVT);
+        assert!(APIC_TIMER_LVT < APIC_TIMER_INITIAL);
+        assert!(APIC_TIMER_INITIAL < APIC_TIMER_CURRENT);
+        assert!(APIC_TIMER_CURRENT < APIC_TIMER_DIV);
+    }
+
+    /// 测试：APIC 基地址是页对齐的
+    #[test]
+    fn test_apic_base_page_aligned() {
+        assert_eq!(APIC_DEFAULT_BASE % 4096, 0, "APIC 基地址应页对齐");
+    }
+
+    /// 测试：Spurious Interrupt Vector 值验证
+    #[test]
+    fn test_spurious_vector_value() {
+        // 0xFF = 255，是有效的中断向量号
+        assert!(SPURIOUS_VECTOR >= 32, "Spurious 向量号应 >= 32");
+        assert_eq!(SPURIOUS_VECTOR, 0xFF);
     }
 }

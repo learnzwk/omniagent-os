@@ -5,7 +5,7 @@
 use core::fmt;
 
 /// 配置错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConfigError {
     /// 键不存在
     KeyNotFound(alloc::string::String),

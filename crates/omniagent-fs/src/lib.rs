@@ -3,7 +3,7 @@
 //! 提供虚拟文件系统 (VFS)、Agent 专用文件系统等功能。
 //! 支持内存文件系统、目录操作、文件读写、权限管理等。
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
@@ -15,6 +15,15 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not};
+use core::sync::atomic::{AtomicU64, Ordering};
+
+/// 全局模拟时间计数器
+static MOCK_TIMESTAMP: AtomicU64 = AtomicU64::new(1);
+
+/// 获取下一个模拟时间戳
+fn next_timestamp() -> u64 {
+    MOCK_TIMESTAMP.fetch_add(1, Ordering::SeqCst)
+}
 
 // === 文件系统类型 ===
 
@@ -315,6 +324,7 @@ pub struct INode {
 impl INode {
     /// 创建新的 INode
     pub fn new(id: u64, file_type: FileType, permissions: FilePermissions) -> Self {
+        let ts = next_timestamp();
         INode {
             id,
             file_type,
@@ -322,15 +332,16 @@ impl INode {
             permissions,
             data: Vec::new(),
             children: Vec::new(),
-            created_at: 0,
-            modified_at: 0,
-            accessed_at: 0,
+            created_at: ts,
+            modified_at: ts,
+            accessed_at: ts,
             parent: None,
         }
     }
 
     /// 创建目录 INode
     pub fn new_dir(id: u64, permissions: FilePermissions) -> Self {
+        let ts = next_timestamp();
         INode {
             id,
             file_type: FileType::Directory,
@@ -338,9 +349,9 @@ impl INode {
             permissions,
             data: Vec::new(),
             children: Vec::new(),
-            created_at: 0,
-            modified_at: 0,
-            accessed_at: 0,
+            created_at: ts,
+            modified_at: ts,
+            accessed_at: ts,
             parent: None,
         }
     }
@@ -431,6 +442,9 @@ impl fmt::Display for FsError {
     }
 }
 
+#[cfg(test)]
+impl std::error::Error for FsError {}
+
 /// 文件系统统计信息
 #[derive(Debug, Clone)]
 pub struct FsStats {
@@ -458,6 +472,8 @@ pub struct VirtualFileSystem {
     open_files: BTreeMap<u32, OpenFile>,
     /// 下一个文件描述符
     next_fd: u32,
+    /// 空闲文件描述符回收列表
+    free_fds: Vec<u32>,
     /// 下一个 INode 编号
     next_inode: u64,
     /// 文件系统类型
@@ -472,6 +488,7 @@ impl VirtualFileSystem {
             root_inode: 0,
             open_files: BTreeMap::new(),
             next_fd: 0,
+            free_fds: Vec::new(),
             next_inode: 0,
             fs_type,
         }
@@ -494,9 +511,13 @@ impl VirtualFileSystem {
 
     /// 分配新的文件描述符
     fn alloc_fd(&mut self) -> FileDescriptor {
-        let fd = self.next_fd;
-        self.next_fd += 1;
-        FileDescriptor(fd)
+        if let Some(fd) = self.free_fds.pop() {
+            FileDescriptor(fd)
+        } else {
+            let fd = self.next_fd;
+            self.next_fd += 1;
+            FileDescriptor(fd)
+        }
     }
 
     /// 解析路径，返回对应的 INode 编号
@@ -618,7 +639,7 @@ impl VirtualFileSystem {
 
         // 更新访问时间
         if let Some(inode) = self.inodes.get_mut(&inode_id) {
-            inode.accessed_at = 0; // 简化：使用 0 表示当前时间
+            inode.accessed_at = next_timestamp();
         }
 
         Ok(fd)
@@ -629,6 +650,8 @@ impl VirtualFileSystem {
         if self.open_files.remove(&fd.0).is_none() {
             Err(FsError::NotOpen(fd))
         } else {
+            // 回收文件描述符
+            self.free_fds.push(fd.0);
             Ok(())
         }
     }
@@ -665,7 +688,7 @@ impl VirtualFileSystem {
         }
 
         // 更新访问时间
-        inode.accessed_at = 0;
+        inode.accessed_at = next_timestamp();
 
         Ok(bytes_read)
     }
@@ -700,7 +723,7 @@ impl VirtualFileSystem {
 
         inode.data[offset..offset + buf.len()].copy_from_slice(buf);
         inode.size = inode.data.len() as u64;
-        inode.modified_at = 0;
+        inode.modified_at = next_timestamp();
 
         // 更新偏移量
         if let Some(of) = self.open_files.get_mut(&fd.0) {

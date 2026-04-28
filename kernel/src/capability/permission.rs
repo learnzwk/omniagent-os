@@ -194,4 +194,134 @@ mod tests {
         assert!(!PermissionChecker::check_all(&token, &["read_files"]));
         assert!(!PermissionChecker::check_any(&token, &["read_files"]));
     }
+
+    /// 测试：空能力令牌的所有检查都应返回 false
+    #[test]
+    fn test_check_empty_token() {
+        let token = make_test_token(alloc::vec![]);
+
+        assert!(!PermissionChecker::check(&token, "read_files"));
+        assert!(!PermissionChecker::check(&token, ""));
+        assert!(!PermissionChecker::check_all(&token, &["read_files"]));
+        assert!(PermissionChecker::check_all(&token, &[])); // 空列表应返回 true
+        assert!(!PermissionChecker::check_any(&token, &["read_files"]));
+        assert!(!PermissionChecker::check_any(&token, &[])); // 空列表应返回 false
+    }
+
+    /// 测试：无效能力名称检查
+    #[test]
+    fn test_check_invalid_capability_names() {
+        let token = make_test_token(alloc::vec![predefined::READ_FILES]);
+
+        // 各种无效名称
+        assert!(!PermissionChecker::check(&token, ""));
+        assert!(!PermissionChecker::check(&token, "READ_FILES")); // 大小写敏感
+        assert!(!PermissionChecker::check(&token, "read_files "));
+        assert!(!PermissionChecker::check(&token, " read_files"));
+        assert!(!PermissionChecker::check(&token, "read_file")); // 部分匹配
+        assert!(!PermissionChecker::check(&token, "read_files_extra"));
+    }
+
+    /// 测试：多能力检查 - 拥有全部预定义能力
+    #[test]
+    fn test_check_all_predefined_capabilities() {
+        let token = make_test_token(predefined::all());
+
+        // 检查所有预定义能力
+        assert!(PermissionChecker::check(&token, "read_files"));
+        assert!(PermissionChecker::check(&token, "write_files"));
+        assert!(PermissionChecker::check(&token, "execute"));
+        assert!(PermissionChecker::check(&token, "network"));
+        assert!(PermissionChecker::check(&token, "create_agent"));
+        assert!(PermissionChecker::check(&token, "kill_agent"));
+        assert!(PermissionChecker::check(&token, "send_message"));
+        assert!(PermissionChecker::check(&token, "receive_message"));
+        assert!(PermissionChecker::check(&token, "manage_system"));
+        assert!(PermissionChecker::check(&token, "access_hardware"));
+        assert!(PermissionChecker::check(&token, "manage_security"));
+    }
+
+    /// 测试：部分能力匹配 - check_all 部分匹配应失败
+    #[test]
+    fn test_check_all_partial_match() {
+        let token = make_test_token(alloc::vec![predefined::READ_FILES, predefined::WRITE_FILES]);
+
+        // 全部匹配应成功
+        assert!(PermissionChecker::check_all(&token, &["read_files", "write_files"]));
+
+        // 部分匹配应失败
+        assert!(!PermissionChecker::check_all(&token, &["read_files", "network"]));
+        assert!(!PermissionChecker::check_all(&token, &["write_files", "execute"]));
+        assert!(!PermissionChecker::check_all(&token, &["network", "execute"]));
+    }
+
+    /// 测试：check_any 部分匹配应成功
+    #[test]
+    fn test_check_any_partial_match() {
+        let token = make_test_token(alloc::vec![predefined::READ_FILES]);
+
+        // 只要有一个匹配就应成功
+        assert!(PermissionChecker::check_any(&token, &["read_files", "network"]));
+        assert!(PermissionChecker::check_any(&token, &["network", "read_files", "execute"]));
+        assert!(PermissionChecker::check_any(&token, &["execute", "read_files"]));
+
+        // 全部不匹配应失败
+        assert!(!PermissionChecker::check_any(&token, &["network", "execute", "manage_system"]));
+    }
+
+    /// 测试：check_all 和 check_any 对空列表的行为
+    #[test]
+    fn test_check_empty_list() {
+        let token = make_test_token(alloc::vec![predefined::READ_FILES]);
+
+        // check_all 对空列表应返回 true（vacuous truth）
+        assert!(PermissionChecker::check_all(&token, &[]));
+
+        // check_any 对空列表应返回 false
+        assert!(!PermissionChecker::check_any(&token, &[]));
+    }
+
+    /// 测试：撤销后所有检查方法都应返回 false
+    #[test]
+    fn test_revoked_all_methods() {
+        let token = make_test_token(alloc::vec![
+            predefined::READ_FILES,
+            predefined::WRITE_FILES,
+            predefined::NETWORK,
+        ]);
+
+        // 撤销令牌
+        token.is_revoked.store(true, Ordering::SeqCst);
+
+        // check 应返回 false
+        assert!(!PermissionChecker::check(&token, "read_files"));
+        assert!(!PermissionChecker::check(&token, "write_files"));
+        assert!(!PermissionChecker::check(&token, "network"));
+
+        // check_all 应返回 false
+        assert!(!PermissionChecker::check_all(&token, &["read_files"]));
+        assert!(!PermissionChecker::check_all(&token, &["read_files", "write_files"]));
+        assert!(!PermissionChecker::check_all(&token, &[])); // 撤销后即使空列表也应返回 false
+
+        // check_any 应返回 false
+        assert!(!PermissionChecker::check_any(&token, &["read_files"]));
+        assert!(!PermissionChecker::check_any(&token, &["read_files", "network"]));
+        assert!(!PermissionChecker::check_any(&token, &[]));
+    }
+
+    /// 测试：重复能力条目
+    #[test]
+    fn test_check_duplicate_capabilities() {
+        // 创建包含重复能力的令牌
+        let token = make_test_token(alloc::vec![
+            predefined::READ_FILES,
+            predefined::READ_FILES, // 重复
+        ]);
+
+        // 重复能力不应影响检查结果
+        assert!(PermissionChecker::check(&token, "read_files"));
+        assert!(!PermissionChecker::check(&token, "network"));
+        assert!(PermissionChecker::check_all(&token, &["read_files"]));
+        assert!(PermissionChecker::check_any(&token, &["read_files", "network"]));
+    }
 }

@@ -6,17 +6,17 @@ use core::fmt;
 
 /// 服务状态（前向声明，由 registry 模块定义）
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ServiceState(pub u8);
+pub struct ServiceStateRaw(pub u8);
 
 /// 服务错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ServiceError {
     /// 服务未找到
     ServiceNotFound(u64),
     /// 服务已存在
     ServiceAlreadyExists(u64),
     /// 无效状态转换
-    InvalidState { current: ServiceState, expected: ServiceState },
+    InvalidState { current: ServiceStateRaw, expected: ServiceStateRaw },
     /// 依赖服务未找到
     DependencyNotFound(alloc::string::String),
     /// 循环依赖

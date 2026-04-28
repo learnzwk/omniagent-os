@@ -189,6 +189,9 @@ impl fmt::Display for IpcError {
 }
 
 #[cfg(test)]
+impl std::error::Error for IpcError {}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

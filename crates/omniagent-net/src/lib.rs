@@ -3,7 +3,7 @@
 //! 提供虚拟网络功能，包括 IP 地址、MAC 地址、TCP/UDP 套接字、
 //! 网络接口管理和 DNS 解析等功能。
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
@@ -84,6 +84,26 @@ impl IpAddress {
                     }
                 }
                 s
+            }
+        }
+    }
+}
+
+impl fmt::Display for IpAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IpAddress::V4(addr) => write!(f, "{}.{}.{}.{}", addr[0], addr[1], addr[2], addr[3]),
+            IpAddress::V6(addr) => {
+                write!(f, "[")?;
+                for i in 0..16 {
+                    if i > 0 && i % 2 == 0 {
+                        write!(f, ":")?;
+                    }
+                    if i % 2 == 0 {
+                        write!(f, "{:x}", (addr[i] as u16) << 8 | addr[i + 1] as u16)?;
+                    }
+                }
+                write!(f, "]")
             }
         }
     }
@@ -635,6 +655,9 @@ impl fmt::Display for NetError {
         }
     }
 }
+
+#[cfg(test)]
+impl std::error::Error for NetError {}
 
 /// 网络统计信息
 #[derive(Debug, Clone)]

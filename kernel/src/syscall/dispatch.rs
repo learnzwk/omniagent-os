@@ -223,7 +223,10 @@ unsafe fn handle_agent_spawn(args: &SyscallArgs) -> i64 {
 
     // 调用 Agent 池创建 Agent (creator_pid 暂用 0)
     let pool_guard = AGENT_POOL.lock();
-    let pool = pool_guard.as_ref().expect("Agent 池未初始化");
+    let pool = match pool_guard.as_ref() {
+        Some(p) => p,
+        None => return E_AGAIN as i64,
+    };
     match pool.spawn(spec, 0) {
         Ok(handle) => handle.0 as i64,
         Err(e) => error_to_i64(e),
@@ -242,7 +245,10 @@ unsafe fn handle_agent_kill(args: &SyscallArgs) -> i64 {
     let signal = args.arg2 as u32;
 
     let pool_guard = AGENT_POOL.lock();
-    let pool = pool_guard.as_ref().expect("Agent 池未初始化");
+    let pool = match pool_guard.as_ref() {
+        Some(p) => p,
+        None => return E_AGAIN as i64,
+    };
     match pool.kill(handle, signal) {
         Ok(()) => E_OK as i64,
         Err(e) => error_to_i64(e),
@@ -274,7 +280,10 @@ unsafe fn handle_agent_query(args: &SyscallArgs) -> i64 {
 
     // 查询 Agent 信息
     let pool_guard = AGENT_POOL.lock();
-    let pool = pool_guard.as_ref().expect("Agent 池未初始化");
+    let pool = match pool_guard.as_ref() {
+        Some(p) => p,
+        None => return E_AGAIN as i64,
+    };
     match pool.query(handle) {
         Ok(info) => {
             // 将 AgentInfo 写入用户态缓冲区
@@ -310,7 +319,10 @@ unsafe fn handle_agent_msg(args: &SyscallArgs) -> i64 {
 
     // 调用通信管理器发送消息
     let comm_guard = COMM_MANAGER.lock();
-    let comm = comm_guard.as_ref().expect("通信管理器未初始化");
+    let comm = match comm_guard.as_ref() {
+        Some(c) => c,
+        None => return E_AGAIN as i64,
+    };
     match comm.send_message(src_handle, dst_handle, header) {
         Ok(msg_id) => msg_id as i64,
         Err(e) => error_to_i64(e),
@@ -366,7 +378,10 @@ unsafe fn handle_agent_subscribe(args: &SyscallArgs) -> i64 {
     // 使用目标句柄的数值作为主题名称
     let topic_bytes = _target.0.to_le_bytes();
     let comm_guard = COMM_MANAGER.lock();
-    let comm = comm_guard.as_ref().expect("通信管理器未初始化");
+    let comm = match comm_guard.as_ref() {
+        Some(c) => c,
+        None => return E_AGAIN as i64,
+    };
     match comm.subscribe(subscriber, &topic_bytes, mask) {
         Ok(()) => E_OK as i64,
         Err(e) => error_to_i64(e),

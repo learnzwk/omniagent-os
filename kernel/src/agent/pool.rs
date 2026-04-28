@@ -31,12 +31,10 @@ pub struct AgentPool {
 impl AgentPool {
     /// 创建新的空 Agent 池
     ///
-    /// 注意: 由于 Rust 1.75 的 const fn 限制，使用 unsafe zeroed 初始化。
-    /// 安全性保证: [Option<AgentControlBlock>; N] 全零表示全 None，
-    /// 因为 AgentControlBlock 不含引用类型，Option 的 None 表示为零值。
-    pub const fn new() -> Self {
+    /// 使用 core::array::from_fn 安全初始化所有槽位为 None。
+    pub fn new() -> Self {
         AgentPool {
-            agents: Mutex::new(unsafe { core::mem::zeroed() }),
+            agents: Mutex::new(core::array::from_fn(|_| None)),
             next_handle: AtomicU64::new(1),
             active_count: AtomicU32::new(0),
         }

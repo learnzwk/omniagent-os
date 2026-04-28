@@ -5,7 +5,7 @@
 use core::fmt;
 
 /// 日志错误枚举
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LoggerError {
     /// 缓冲区已满
     BufferFull,
